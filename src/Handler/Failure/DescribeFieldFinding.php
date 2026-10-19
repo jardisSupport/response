@@ -18,11 +18,11 @@ use JardisSupport\Contract\Validation\ValidationResult;
  */
 final class DescribeFieldFinding
 {
-    public const KEY_PREFIX = 'validation';
-    public const REASON_MISSING = ValidationResult::REASON_MISSING;
-    public const REASON_INVALID = ValidationResult::REASON_INVALID;
-    public const TEXT_MISSING = 'Field is required.';
-    public const TEXT_INVALID = 'Field is invalid.';
+    public const string KEY_PREFIX = 'validation';
+    public const string REASON_MISSING = ValidationResult::REASON_MISSING;
+    public const string REASON_INVALID = ValidationResult::REASON_INVALID;
+    public const string TEXT_MISSING = 'Field is required.';
+    public const string TEXT_INVALID = 'Field is invalid.';
 
     /**
      * @param array{field: string, reason: string, message: string} $finding

@@ -1,11 +1,11 @@
 # jardissupport/response
 
-Response building for one request-response use case: response objects (`ContextResponse`, `DomainResponse`), failure forms (400 `ValidationFailure`, 404 `NotFound`, 409 `Conflict`, 422 `RuleViolation`), the `data` of the response envelope `{status, data, errors, meta}`, read answers (`ReadResult`, `Reference`). The door steps (input validation, actor check, failure mapping) follow in P3. Details: `README.md`, https://docs.jardis.io/en/support/response
+Response building for one request-response use case: response objects (`ContextResponse`, `DomainResponse`), failure forms (400 `ValidationFailure`, 404 `NotFound`, 409 `Conflict`, 422 `RuleViolation`), the `data` of the response envelope `{status, data, errors, meta}`, read answers (`ReadResult`, `Reference`). The door steps (input validation, actor check, failure mapping, cause logging) are part of the package. Details: `README.md`, https://docs.jardis.io/en/support/response
 
 ## Layout (`src/`)
 
-- `Data/` — `ReadResult`, `Reference`, `Failure/*` (the four failure forms behind `FailureForm`), `Response/*` (`ContextResponse`, `DomainResponse`)
-- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Failure/` (payload builders, `BuildFailureForm`, `DescribeFieldFinding`), `Response/` (`TransformResponse`)
+- `Data/` — `ReadResult`, `Reference`, `InputFindings`, `MappedFailure`, `Failure/*` (the four failure forms behind `FailureForm`), `Response/*` (`ContextResponse`, `DomainResponse`)
+- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Door/` (`ValidateInput`, `CheckActor`), `Failure/` (payload builders, `BuildFailureForm`, `BuildFailureOutcome`, `DescribeFieldFinding`, `MapThrowable`, `LogCause`), `Response/` (`BuildResponseData`, `TransformResponse`)
 - `Exception/` — `ConfigurationException` (extends `\RuntimeException`)
 
 ## Commands (always `make`)
