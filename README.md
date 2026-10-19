@@ -65,6 +65,121 @@ The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/
 
 The `messageKey` a node declared joins the data of a 404/409/400 last; the 422 form always carries its own.
 
+## Installation
+
+```bash
+composer require jardissupport/response
+```
+
+Requires PHP 8.3+, `jardissupport/contracts` ^2.13, `psr/log` and `psr/clock` (see Requirements). The transaction bracket (`jardissupport/repository`) and the process engine (`jardissupport/workflow`) are separate packages the door uses next to this one; this package depends on neither.
+
+## Quick Start
+
+The door of a use case in front of the process engine, the way the generator emits it for a process (classes shown without a namespace). `$this->handle(Class::class, ...named arguments)` resolves a step through the kernel container (the same as `new Class(...)`); `$this->payload()`, `$this->actor()`, `$this->result()`, `$this->transformer()` and `$this->resource()` are the request-response context of the generated handler.
+
+```php
+use JardisSupport\Contract\Kernel\EventScope;
+use JardisSupport\Contract\Kernel\ResponseStatus;
+use JardisSupport\Repository\Handler\Transaction\ResolveConnection;
+use JardisSupport\Repository\Handler\Transaction\RunInTransaction;
+use JardisSupport\Response\Handler\Door\CheckActor;
+use JardisSupport\Response\Handler\Door\ValidateInput;
+use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
+use JardisSupport\Response\Handler\Failure\LogCause;
+use JardisSupport\Response\Handler\Failure\MapThrowable;
+use JardisSupport\Response\Handler\Failure\ValidationPayload;
+use JardisSupport\Response\Handler\Response\BuildResponseData;
+use JardisSupport\Workflow\Data\ProcessOutcome;
+use JardisSupport\Workflow\ProcessRunner;
+use Throwable;
+
+$definition = (new IssueInvoiceForOrderDefinition())();
+$input = $this->payload();
+
+// 1. input check: valid exactly when fields === [], else 400
+$findings = ($this->handle(ValidateInput::class, validator: $validator))($input);
+if ($findings->fields !== []) {
+    foreach ($findings->errors as $error) {
+        $this->result()->addError($error);
+    }
+    $this->result()->setData(
+        ($this->handle(BuildResponseData::class))(
+            ResponseStatus::ValidationError,
+            ($this->handle(ValidationPayload::class))('validation', $findings->fields),
+            null,
+            ''
+        )
+    );
+
+    return ($this->transformer())($this->result(), ResponseStatus::ValidationError);
+}
+
+// 2. actor check: false = 401
+if (!($this->handle(CheckActor::class))($definition->getActorClass() !== null, $this->actor())) {
+    $this->result()->setData([]);
+
+    return ($this->transformer())($this->result(), ResponseStatus::Unauthorized);
+}
+
+// 3. transaction bracket (jardissupport/repository), 4. engine (jardissupport/workflow)
+$connection = ($this->handle(ResolveConnection::class))($this->resource()->dbConnection());
+$owner = $connection?->inTransaction() !== true;
+
+try {
+    $depth = $this->depth();
+    $run = fn(): ProcessOutcome => ($this->handle(ProcessRunner::class))->run(
+        $definition,
+        $input,
+        $this->actor(),
+        fn(string $class): object => $this->handle($class),
+        $depth
+    );
+    $outcome = ($this->handle(RunInTransaction::class))(
+        $connection,
+        'sp_' . $depth,
+        $run,
+        static fn(ProcessOutcome $outcome): bool => $outcome->status()->value >= 400,
+        $depth > 0
+    );
+    foreach ($outcome->events() as $event) {
+        $this->result()->addEvent($event, EventScope::Domain);
+    }
+    foreach ($outcome->errors() as $error) {
+        $this->result()->addError($error);
+    }
+    $status = $outcome->status();
+    $response = $status->value >= 400
+        ? ($this->handle(BuildFailureOutcome::class))(
+            $status,
+            (string) $outcome->messageKey(),
+            $outcome->context(),
+            $outcome->errors(),
+            true
+        )
+        : $outcome->response();
+
+    // 5. the data of the envelope, then the DomainResponse {status, data, errors, meta}
+    $this->result()->setData(
+        ($this->handle(BuildResponseData::class))($status, $response, $outcome->messageKey(), $definition->getName())
+    );
+
+    return ($this->transformer())($this->result(), $status);
+} catch (Throwable $e) {
+    // 4. a thrown failure: 4xx mapped, 5xx cause logged once by the owner
+    $failure = ($this->handle(MapThrowable::class))($e, $owner, $definition->getName());
+    if ($owner && $failure->status->value >= ResponseStatus::InternalError->value) {
+        ($this->handle(LogCause::class, logger: $this->resource()->logger()))($e, $definition->getName());
+    }
+    $this->result()->setData(
+        ($this->handle(BuildResponseData::class))($failure->status, $failure->response, null, '')
+    );
+
+    return ($this->transformer())($this->result(), $failure->status);
+}
+```
+
+`$validator` is a `ValidatorInterface` (the generated handler builds an `ObjectValidator` over the validator registry of the process). `TransformResponse` is what `$this->transformer()` returns: it turns the context response into the `DomainResponseInterface`. For a read answer see `Data/ReadResult` and `Data/Reference`.
+
 ## Requirements
 
 `php >=8.3`, `jardissupport/contracts ^2.13`, `psr/log ^3.0`, `psr/clock ^1.0`. Dev: `jardissupport/validation`, `jardissupport/scheduling`. Never `jardissupport/workflow`.
