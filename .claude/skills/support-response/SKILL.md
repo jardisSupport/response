@@ -59,7 +59,7 @@ $domainResponse = (new TransformResponse($clock, $version))($result, $status);  
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
 | 401 / 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (8 cases: 200, 200-empty, 400, 401, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+The wire contract `tests/Smoke/Contract/wire-contract.json` (9 cases: 200, 200-empty, 200-datetime-offset, 400, 401, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
 
 ## Full reference
 

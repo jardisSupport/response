@@ -48,6 +48,32 @@
                 }
             }
         },
+        "200-datetime-offset": {
+            "process": "Login",
+            "scenario": "last node answers an instant with the offset +02:00, the wire carries it in UTC",
+            "envelope": {
+                "status": 200,
+                "data": {
+                    "@type": "login",
+                    "accessToken": "access-token-1",
+                    "refreshToken": "refresh-token-1",
+                    "expiresAt": "2026-01-15T10:45:00+00:00",
+                    "tenants": [
+                        "acme",
+                        "globex"
+                    ]
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "LoginHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+        },
         "400": {
             "process": "OrderBulkQuote",
             "scenario": "start check: malformed input fields, no node runs",

@@ -26,8 +26,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the eight cases 200, 200-empty (a last node without an answer of
- * its own: `data` carries only the `@type`), 400, 401, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
+ * `Contract/wire-contract.json` holds, for the nine cases 200, 200-empty (a last node without an answer of
+ * its own: `data` carries only the `@type`), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
+ * the wire carries it in UTC), 400, 401, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
  * of the process handler. This test drives only the door steps - `ValidateInput`, `CheckActor`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
  * with the file. The proof that a generated handler reproduces the same file is the consumer test of the
@@ -62,6 +63,7 @@ class WireContractTest extends TestCase
         $expected = [
             ['200', 200],
             ['200-empty', 200],
+            ['200-datetime-offset', 200],
             ['400', 400],
             ['401', 401],
             ['404', 404],
@@ -75,6 +77,7 @@ class WireContractTest extends TestCase
             $this->assertSame($status, $cases[$key]['envelope']['status'], 'case ' . $key);
         }
         $this->assertSame(['@type' => 'voucherRedeemCheck'], $cases['200-empty']['envelope']['data']);
+        $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['expiresAt']);
     }
 
     /**
@@ -92,6 +95,7 @@ class WireContractTest extends TestCase
             'cases' => [
                 '200' => $this->case('OrderBulkQuote', 'valid input, one action node answers a typed response', $this->success()),
                 '200-empty' => $this->case('VoucherRedeemCheck', 'rule node is the last node and answers no data of its own, the answer is empty', $this->successWithoutAnswer()),
+                '200-datetime-offset' => $this->case('Login', 'last node answers an instant with the offset +02:00, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '401' => $this->case('VoucherRedeemCheck', 'start check: the declared actor is missing, no node runs', $this->actorMissing()),
                 '404' => $this->case('RegisterAndReviseServiceOptOut', 'second call node: the callee answers 404, declared key', $this->revisionTargetMissing()),
@@ -155,6 +159,27 @@ class WireContractTest extends TestCase
             ResponseStatus::Success,
             (new BuildResponseData())(ResponseStatus::Success, new \stdClass(), null, 'VoucherRedeemCheck')
         );
+    }
+
+    /**
+     * The answer holds an instant 12:45+02:00. The data of `BuildResponseData` is not yet wire data; the
+     * caller projects it before the transformer (the generated door: `data` ProjectWire with a type map, which
+     * converts a `date-time` to UTC and formats it as ATOM). The projection is written out here as that
+     * definition because this package does not depend on `data`; the byte proof against the real projection
+     * is the consumer test of the builder.
+     */
+    private function successWithOffsetDate(): DomainResponseInterface
+    {
+        $response = (object) [
+            'accessToken' => 'access-token-1',
+            'refreshToken' => 'refresh-token-1',
+            'expiresAt' => new DateTimeImmutable('2026-01-15T12:45:00+02:00'),
+            'tenants' => ['acme', 'globex'],
+        ];
+        $data = (new BuildResponseData())(ResponseStatus::Success, $response, null, 'Login');
+        $data['expiresAt'] = $data['expiresAt']->setTimezone(new DateTimeZone('UTC'))->format(DATE_ATOM);
+
+        return $this->answer('Login', ResponseStatus::Success, $data);
     }
 
     private function invalidInput(): DomainResponseInterface
