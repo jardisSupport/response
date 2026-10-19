@@ -1,0 +1,53 @@
+{
+    "name": "jardissupport/response",
+    "homepage": "https://jardis.io",
+    "description": "Response building for Jardis request-response use cases: failure forms, response objects, response envelope data and the door steps",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Jardis Development",
+            "email": "jardisDev@headgent.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "jardissupport/contracts": "^2.13",
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0"
+    },
+    "require-dev": {
+        "jardissupport/validation": "^1.7.1",
+        "jardissupport/scheduling": "^1.2",
+        "phpunit/phpunit": "10.5.63",
+        "phpstan/phpstan": "2.1.56",
+        "squizlabs/php_codesniffer": "3.13.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "JardisSupport\\Response\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JardisSupport\\Response\\Tests\\": "tests/"
+        }
+    },
+    "support": {
+        "issues": "https://github.com/jardisSupport/response/issues",
+        "docs": "https://docs.jardis.io/en/support/response",
+        "email": "jardisDev@headgent.com"
+    },
+    "keywords": [
+        "response",
+        "failure-forms",
+        "envelope",
+        "request-response",
+        "domain-driven-design",
+        "php",
+        "jardis",
+        "headgent"
+    ]
+}
