@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JardisSupport\Response\Handler\Failure;
 
+use JardisSupport\Contract\Kernel\ReportedFailureExceptionInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -11,7 +12,9 @@ use Psr\Log\LoggerInterface;
  *
  * A 5xx answer carries nothing of its throwable, the cause lives only here: the logger gets an
  * `error` (message of the throwable, context `exception` and `process`). Without a logger it does
- * nothing. A logger that fails never replaces the answer.
+ * nothing. A logger that fails never replaces the answer. A cause that carries the marker
+ * {@see ReportedFailureExceptionInterface} was already reported where it arose (the inner door of a call or
+ * sub-process) and is skipped.
  *
  * Exactly once per cause is the door's decision: only the owning run calls this, and never for a
  * 4xx (a business outcome, including the 409 of a stale write the caller repeats).
@@ -24,6 +27,9 @@ final class LogCause
 
     public function __invoke(\Throwable $cause, string $process): void
     {
+        if ($cause instanceof ReportedFailureExceptionInterface) {
+            return;
+        }
         if ($this->logger === null) {
             return;
         }

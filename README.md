@@ -26,7 +26,7 @@ The door of a use case (the generated handler) composes the steps. The package s
 | 1 | `ValidateInput` | checks the input with the injected `ValidatorInterface` | `InputFindings`; valid exactly when `fields === []`, else the door answers 400 |
 | 2 | `CheckActor` | `required` and no actor | `false` = the door answers 401 |
 | 3 | transaction bracket | not in this package - `jardissupport/repository` | - |
-| 4 | `MapThrowable`, `LogCause` | maps a thrown failure to status and response; logs a 5xx cause | `MappedFailure {status, response}`; `LogCause` returns nothing |
+| 4 | `MapThrowable`, `LogCause` | maps a thrown failure to status and response; logs a 5xx cause (skips a cause marked as already reported) | `MappedFailure {status, response}`; `LogCause` returns nothing |
 | 5 | `BuildResponseData`, `TransformResponse` | the `data` of the envelope, then the `DomainResponse` | `{status, data, errors, meta}` |
 
 `MapThrowable` knows the owner: `$owner = true` (no transaction was open on entry) answers a stale write with 409, the two contract markers (`ConcurrencyConflictExceptionInterface` with 409, `ValidationExceptionInterface` with 400) with their own fields and everything else with 500. `$owner = false` (a nested run) throws only the `TransientConflictException` and 5xx causes on, so the owner repeats the work and logs the cause once. Every 4xx is always mapped, never thrown.

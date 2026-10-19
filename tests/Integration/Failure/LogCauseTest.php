@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JardisSupport\Response\Tests\Integration\Failure;
 
+use JardisSupport\Contract\Kernel\ReportedFailureExceptionInterface;
 use JardisSupport\Contract\Repository\Exception\TransientConflictException;
 use JardisSupport\Response\Handler\Failure\LogCause;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
@@ -74,6 +75,29 @@ class LogCauseTest extends TestCase
         $this->assertCount(1, $logger->records);
         $this->assertSame('Outer', $logger->records[0]['context']['process']);
         $this->assertSame($failure, $logger->records[0]['context']['exception']);
+    }
+
+    public function testACauseAlreadyReportedIsNotLoggedAgain(): void
+    {
+        $logger = new RecordingLogger();
+        $reported = new class ('Operation answered with status 500') extends \RuntimeException implements
+            ReportedFailureExceptionInterface {
+        };
+
+        (new LogCause($logger))($reported, 'Outer');
+
+        $this->assertSame([], $logger->records);
+    }
+
+    public function testAnOrdinaryCauseIsStillLogged(): void
+    {
+        $logger = new RecordingLogger();
+        $ordinary = new \RuntimeException('Operation answered with status 500');
+
+        (new LogCause($logger))($ordinary, 'Outer');
+
+        $this->assertCount(1, $logger->records);
+        $this->assertSame($ordinary, $logger->records[0]['context']['exception']);
     }
 
     public function testAFailingLoggerNeverBreaksTheCaller(): void
