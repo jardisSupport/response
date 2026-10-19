@@ -48,6 +48,28 @@
                 }
             }
         },
+        "200-merged": {
+            "process": "OrderQuoteSummary",
+            "scenario": "two action nodes, the answer is the data of both united in run order, the later node wins on the same field",
+            "envelope": {
+                "status": 200,
+                "data": {
+                    "@type": "orderQuoteSummary",
+                    "currency": "EUR",
+                    "lineCount": 3,
+                    "total": "42.50"
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "OrderQuoteSummaryHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+        },
         "200-datetime-offset": {
             "process": "Login",
             "scenario": "last node answers an instant with the offset +02:00, the wire carries it in UTC",

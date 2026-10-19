@@ -26,8 +26,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the nine cases 200, 200-empty (a last node without an answer of
- * its own: `data` carries only the `@type`), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
+ * `Contract/wire-contract.json` holds, for the ten cases 200, 200-empty (a last node without an answer of
+ * its own: `data` carries only the `@type`), 200-merged (the answer is the data of all nodes united in run order,
+ * the later node wins on the same field), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
  * the wire carries it in UTC), 400, 401, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
  * of the process handler. This test drives only the door steps - `ValidateInput`, `CheckActor`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
@@ -63,6 +64,7 @@ class WireContractTest extends TestCase
         $expected = [
             ['200', 200],
             ['200-empty', 200],
+            ['200-merged', 200],
             ['200-datetime-offset', 200],
             ['400', 400],
             ['401', 401],
@@ -77,6 +79,10 @@ class WireContractTest extends TestCase
             $this->assertSame($status, $cases[$key]['envelope']['status'], 'case ' . $key);
         }
         $this->assertSame(['@type' => 'voucherRedeemCheck'], $cases['200-empty']['envelope']['data']);
+        $this->assertSame(
+            ['@type' => 'orderQuoteSummary', 'currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50'],
+            $cases['200-merged']['envelope']['data']
+        );
         $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['expiresAt']);
     }
 
@@ -95,6 +101,7 @@ class WireContractTest extends TestCase
             'cases' => [
                 '200' => $this->case('OrderBulkQuote', 'valid input, one action node answers a typed response', $this->success()),
                 '200-empty' => $this->case('VoucherRedeemCheck', 'rule node is the last node and answers no data of its own, the answer is empty', $this->successWithoutAnswer()),
+                '200-merged' => $this->case('OrderQuoteSummary', 'two action nodes, the answer is the data of both united in run order, the later node wins on the same field', $this->successMerged()),
                 '200-datetime-offset' => $this->case('Login', 'last node answers an instant with the offset +02:00, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '401' => $this->case('VoucherRedeemCheck', 'start check: the declared actor is missing, no node runs', $this->actorMissing()),
@@ -158,6 +165,25 @@ class WireContractTest extends TestCase
             'VoucherRedeemCheck',
             ResponseStatus::Success,
             (new BuildResponseData())(ResponseStatus::Success, new \stdClass(), null, 'VoucherRedeemCheck')
+        );
+    }
+
+    /**
+     * The answer form `merged` of the process engine: the data of all nodes united in run order, the later node
+     * wins on the same field name (`array_replace`, `jardissupport/workflow` `BuildOutcome::merged`). The union is
+     * written out here because this package does not depend on `workflow`; the byte proof against the real
+     * engine is the consumer test of the builder.
+     */
+    private function successMerged(): DomainResponseInterface
+    {
+        $first = ['currency' => 'EUR', 'lineCount' => 2];
+        $second = ['lineCount' => 3, 'total' => '42.50'];
+        $response = (object) array_replace($first, $second);
+
+        return $this->answer(
+            'OrderQuoteSummary',
+            ResponseStatus::Success,
+            (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderQuoteSummary')
         );
     }
 
