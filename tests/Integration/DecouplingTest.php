@@ -59,6 +59,7 @@ class DecouplingTest extends TestCase
         ],
         'Data\\InputFindings' => [
             '__construct(array $fields, array $errors)',
+            'failed(): bool',
             'prop array $fields',
             'prop array $errors',
         ],
@@ -76,9 +77,19 @@ class DecouplingTest extends TestCase
             'isEmpty(): bool',
         ],
         'Data\\Reference' => [
-            '__construct(string|int $root, array $children = …)',
+            'const string DEFAULT_IDENTIFIER',
+            '__construct(string|int $root, array $children = …, string $identifier = …)',
             'root(): string|int',
             'children(): array',
+            'identifier(): string',
+        ],
+        'Data\\RuleResult' => [
+            'static pass(): self',
+            'static reject(string $rule, string $messageKey, array $context = …): self',
+            'prop bool $passed',
+            'prop string $rule',
+            'prop string $messageKey',
+            'prop array $context',
         ],
         'Data\\Response\\ContextResponse' => [
             '__construct(string $context)',
@@ -100,6 +111,40 @@ class DecouplingTest extends TestCase
             'getEvents(?EventScope $scope = …): array',
             'getErrors(): array',
             'getMetadata(): array',
+        ],
+        'Handler\\Answer\\AnswerCommand' => [
+            '__construct(BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, Reference $reference, string $aggregate): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerFindings' => [
+            'const string MESSAGE_KEY',
+            '__construct(ValidationPayload $validationPayload = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerNotFound' => [
+            'const string MESSAGE_KEY',
+            '__construct(NotFoundPayload $notFoundPayload = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, array $context): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerOutcome' => [
+            '__construct(BuildFailureOutcome $buildFailureOutcome = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, AnswerableOutcomeInterface $outcome, string $processName): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerRead' => [
+            '__construct(BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, ReadResult $found, string $type): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerRuleViolation' => [
+            '__construct(RuleViolationPayload $ruleViolationPayload = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, RuleResult $rejection): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerThrowable' => [
+            '__construct(MapThrowable $mapThrowable = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, Throwable $failure, bool $owner, string $aggregate): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerUnauthorized' => [
+            '__construct(BuildFailureOutcome $buildFailureOutcome = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform): DomainResponseInterface',
         ],
         'Handler\\Door\\CheckActor' => [
             'const string MESSAGE_KEY',
@@ -132,6 +177,10 @@ class DecouplingTest extends TestCase
         'Handler\\Failure\\LogCause' => [
             '__construct(?LoggerInterface $logger)',
             '__invoke(Throwable $cause, string $process): void',
+        ],
+        'Handler\\Failure\\LogFailure' => [
+            '__construct(?LoggerInterface $logger = …, ?LogCause $logCause = …)',
+            '__invoke(Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void',
         ],
         'Handler\\Failure\\MapThrowable' => [
             'const string CONFLICT_KEY',
@@ -234,7 +283,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(25, $classes);
+        $this->assertCount(35, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

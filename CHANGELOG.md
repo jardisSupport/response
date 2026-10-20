@@ -4,6 +4,16 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Answer closures in `Handler/Answer/` - the door answers by calls only: `AnswerFindings` (400), `AnswerUnauthorized` (401), `AnswerNotFound` (404), `AnswerRuleViolation` (422), `AnswerOutcome` (Domain events, errors, data and status of a process outcome, read through `JardisSupport\Contract\Kernel\AnswerableOutcomeInterface`), `AnswerThrowable` (maps a thrown failure, logs nothing), `AnswerCommand` (write answer from a `Reference`), `AnswerRead` (single read). Each is creatable without constructor arguments (`$this->handle(X::class)`); collaborators are constructor defaults. Bytes equal the hand-assembled sequence of the generated doors (pinned against `wire-contract.json` and the envelope fixtures).
+- `Handler/Failure/LogFailure`: the logging step of a door as its own closure - writes the cause (`LogCause`) only when the caller owns the run and the answer is a 5xx; the owner is a `bool` parameter (no dependency on `repository`).
+- `Data/Reference` carries the wire name of the business identifier (third constructor parameter `$identifier`, default `id`, `identifier()`); child references are answered under their keys (a single child as scalar or `null`, a child list as a list). `BuildResponseData` answers a `Reference` as `{@type, <identifier>: <root>, <children>}`.
+- `Data/RuleResult`: the outcome of a rule invocation (`pass()` / `reject(rule, messageKey, context)`), answered as 422 by `AnswerRuleViolation`.
+- `Data/InputFindings::failed()`: true when at least one field failed, so a door branches on a call instead of comparing `fields`.
+- Needs the contracts release that ships `AnswerableOutcomeInterface`; the `require` is raised with it.
+
 ## [1.1.0] - 2026-10-20
 
 ### Added

@@ -10,6 +10,7 @@ use JardisSupport\Response\Data\Failure\FailureForm;
 use JardisSupport\Response\Data\Failure\NotFound;
 use JardisSupport\Response\Data\Failure\RuleViolation;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
+use JardisSupport\Response\Data\Reference;
 use stdClass;
 
 /**
@@ -17,6 +18,8 @@ use stdClass;
  *
  * The one place the answer of a use case is turned into envelope data:
  * - success: `@type` (the process name, first letter lower case) plus the public fields of the response;
+ *   for a write answer ({@see Reference}) `@type`, the root under the name of its business identifier, then
+ *   the child references under their keys;
  * - 400 `validation`: `@type`, `fields`; 404 `notFound`: `@type`, `context`;
  *   409 `concurrencyConflict`: `@type`, `reason`, `aggregate`, `context`, `violated`;
  *   422 `ruleViolation`: `@type`, `rule`, `messageKey`, `context`;
@@ -45,6 +48,9 @@ final class BuildResponseData
         $data = match (true) {
             $response instanceof FailureForm => $this->failure($response),
             $status->value >= 400 => $declaredMessageKey === null ? [] : get_object_vars($response),
+            $response instanceof Reference => ['@type' => lcfirst($processName)]
+                + [$response->identifier() => $response->root()]
+                + $response->children(),
             default => ['@type' => lcfirst($processName)] + get_object_vars($response),
         };
 
