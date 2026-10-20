@@ -26,9 +26,10 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the ten cases 200, 200-empty (a last node without an answer of
+ * `Contract/wire-contract.json` holds, for the eleven cases 200, 200-empty (a last node without an answer of
  * its own: `data` carries only the `@type`), 200-merged (the answer is the data of all nodes united in run order,
- * the later node wins on the same field), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
+ * the later node wins on the same field), 200-answer-class (merged with a process answer class: the union is
+ * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
  * the wire carries it in UTC), 400, 401, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
  * of the process handler. This test drives only the door steps - `ValidateInput`, `CheckActor`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
@@ -65,6 +66,7 @@ class WireContractTest extends TestCase
             ['200', 200],
             ['200-empty', 200],
             ['200-merged', 200],
+            ['200-answer-class', 200],
             ['200-datetime-offset', 200],
             ['400', 400],
             ['401', 401],
@@ -82,6 +84,10 @@ class WireContractTest extends TestCase
         $this->assertSame(
             ['@type' => 'orderQuoteSummary', 'currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50'],
             $cases['200-merged']['envelope']['data']
+        );
+        $this->assertSame(
+            ['@type' => 'orderShipment', 'orderNo' => 'A-1001', 'state' => 'Shipped'],
+            $cases['200-answer-class']['envelope']['data']
         );
         $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['expiresAt']);
     }
@@ -102,6 +108,7 @@ class WireContractTest extends TestCase
                 '200' => $this->case('OrderBulkQuote', 'valid input, one action node answers a typed response', $this->success()),
                 '200-empty' => $this->case('VoucherRedeemCheck', 'rule node is the last node and answers no data of its own, the answer is empty', $this->successWithoutAnswer()),
                 '200-merged' => $this->case('OrderQuoteSummary', 'two action nodes, the answer is the data of both united in run order, the later node wins on the same field', $this->successMerged()),
+                '200-answer-class' => $this->case('OrderShipment', 'merged with a process answer class: the last node is a sub-process with a foreign answer, only the declared fields reach the wire', $this->successAnswerClass()),
                 '200-datetime-offset' => $this->case('Login', 'last node answers an instant with the offset +02:00, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '401' => $this->case('VoucherRedeemCheck', 'start check: the declared actor is missing, no node runs', $this->actorMissing()),
@@ -184,6 +191,29 @@ class WireContractTest extends TestCase
             'OrderQuoteSummary',
             ResponseStatus::Success,
             (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderQuoteSummary')
+        );
+    }
+
+    /**
+     * The answer form `merged` with a process answer class (`jardissupport/workflow` `ProcessDefinition::answerResponse`):
+     * the union of all steps (later wins) is projected onto the declared constructor fields of the answer class,
+     * independent of kind and data of the last node. The last node here is a sub-process whose own answer carries
+     * foreign fields (`carrier`, `trackingNo`); they fall away, the declared fields `orderNo` and `state` reach the
+     * wire in declaration order. The projection is written out here because this package does not depend on
+     * `workflow`; the byte proof against the real engine is the consumer test of the builder.
+     */
+    private function successAnswerClass(): DomainResponseInterface
+    {
+        $first = ['orderNo' => 'A-1001', 'state' => 'Packed'];
+        $subProcessAnswer = ['state' => 'Shipped', 'carrier' => 'DHL', 'trackingNo' => 'T-77'];
+        $united = array_replace($first, $subProcessAnswer);
+        $declared = ['orderNo', 'state'];
+        $response = (object) array_replace(array_flip($declared), array_intersect_key($united, array_flip($declared)));
+
+        return $this->answer(
+            'OrderShipment',
+            ResponseStatus::Success,
+            (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderShipment')
         );
     }
 
