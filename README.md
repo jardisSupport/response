@@ -66,6 +66,8 @@ The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/
   {"field": "items[1].qty", "reason": "invalid", "message": "Must be at least 1", "messageKey": "validation.invalid"}]}}
 ```
 
+The reasons of a field finding are `missing`, `invalid` (validator), `type` and `unknown` (request reader); each is answered with the key `validation.<reason>` and, when the caller delivered no text, its standard text (`Field is required.`, `Field is invalid.`, `Field has an invalid type.`, `Unknown field`). Any other reason is answered as `invalid`. `DescribeFieldFinding` is the one place of this vocabulary.
+
 **404** `NotFound`
 
 ```json

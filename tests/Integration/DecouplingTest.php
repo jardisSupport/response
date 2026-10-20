@@ -170,8 +170,12 @@ class DecouplingTest extends TestCase
             'const string KEY_PREFIX',
             'const string REASON_MISSING',
             'const string REASON_INVALID',
+            'const string REASON_TYPE',
+            'const string REASON_UNKNOWN',
             'const string TEXT_MISSING',
             'const string TEXT_INVALID',
+            'const string TEXT_TYPE',
+            'const string TEXT_UNKNOWN',
             '__invoke(array $finding): array',
         ],
         'Handler\\Failure\\LogCause' => [
