@@ -4,7 +4,12 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [1.0.0] - Unreleased
+## [1.1.0] - 2026-10-20
+
+### Added
+- Wire contract case `200-answer-class` in `tests/Smoke/Contract/wire-contract.json` (11 cases): `Answer::Merged` with a process answer class (`jardissupport/workflow` 4.1 `ProcessDefinition::answerResponse`) - the union of all nodes is projected onto the declared fields, foreign data of the last node (e.g. a sub-process) falls away.
+
+## [1.0.0] - 2026-10-19
 
 ### Added
 - Package scaffold (Docker, Makefile, QA configuration, CI).

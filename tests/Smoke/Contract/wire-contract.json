@@ -70,6 +70,27 @@
                 }
             }
         },
+        "200-answer-class": {
+            "process": "OrderShipment",
+            "scenario": "merged with a process answer class: the last node is a sub-process with a foreign answer, only the declared fields reach the wire",
+            "envelope": {
+                "status": 200,
+                "data": {
+                    "@type": "orderShipment",
+                    "orderNo": "A-1001",
+                    "state": "Shipped"
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "OrderShipmentHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+        },
         "200-datetime-offset": {
             "process": "Login",
             "scenario": "last node answers an instant with the offset +02:00, the wire carries it in UTC",
