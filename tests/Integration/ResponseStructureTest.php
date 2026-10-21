@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 /**
- * The package holds exactly the documented 35 classes (MODELL section 5, plus the answer closures of E2-P7): no more, no fewer, each
+ * The package holds exactly the documented 37 classes (MODELL section 5, plus the answer closures of E2-P7): no more, no fewer, each
  * one loadable under `JardisSupport\Response\...`.
  */
 class ResponseStructureTest extends TestCase
@@ -39,8 +39,10 @@ class ResponseStructureTest extends TestCase
         'Handler\\Door\\ValidateInput',
         'Handler\\Failure\\BuildFailureForm',
         'Handler\\Failure\\BuildFailureOutcome',
+        'Handler\\Failure\\BuildRuleRejectionContext',
         'Handler\\Failure\\ConcurrencyConflictPayload',
         'Handler\\Failure\\DescribeFieldFinding',
+        'Handler\\Failure\\FoldRuleSet',
         'Handler\\Failure\\LogCause',
         'Handler\\Failure\\LogFailure',
         'Handler\\Failure\\MapThrowable',
@@ -63,7 +65,7 @@ class ResponseStructureTest extends TestCase
         }
         sort($found);
 
-        $this->assertCount(35, self::CLASSES);
+        $this->assertCount(37, self::CLASSES);
         $this->assertSame(self::CLASSES, $found);
         foreach (self::CLASSES as $short) {
             $class = new ReflectionClass('JardisSupport\\Response\\' . $short);
