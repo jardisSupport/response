@@ -9,7 +9,7 @@ Status: 1.0.0 in preparation, not released.
 | Group | Content |
 |---|---|
 | Response objects | `Data/Response/ContextResponse`, `Data/Response/DomainResponse`, `Handler/Response/TransformResponse` (context response to `DomainResponseInterface`, injected PSR-20 clock) |
-| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
+| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, ForbiddenPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, CheckActor}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
 | Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
@@ -18,7 +18,7 @@ Status: 1.0.0 in preparation, not released.
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-59 classes, every handler `final` with exactly one public entry point (`__invoke`).
+61 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -32,7 +32,7 @@ The door of a use case (the generated handler) composes the steps. The package s
 | 4 | `MapThrowable`, `LogCause` | maps a thrown failure to status and response; logs a 5xx cause (skips a cause marked as already reported) | `MappedFailure {status, response}`; `LogCause` returns nothing |
 | 5 | `BuildResponseData`, `TransformResponse` | the `data` of the envelope, then the `DomainResponse` | `{status, data, errors, meta}` |
 
-`MapThrowable` knows the owner: `$owner = true` (no transaction was open on entry) answers a stale write with 409, the two contract markers (`ConcurrencyConflictExceptionInterface` with 409, `ValidationExceptionInterface` with 400) with their own fields and everything else with 500. `$owner = false` (a nested run) throws only the `TransientConflictException` and 5xx causes on, so the owner repeats the work and logs the cause once. Every 4xx is always mapped, never thrown.
+`MapThrowable` knows the owner: `$owner = true` (no transaction was open on entry) answers a stale write with 409, the three contract markers (`ConcurrencyConflictExceptionInterface` with 409, `ValidationExceptionInterface` with 400, `AccessDeniedExceptionInterface` with 403 - its `getMessageKey()` and `getContext()` become the key and context of the form) with their own fields and everything else with 500. `$owner = false` (a nested run) throws only the `TransientConflictException` and 5xx causes on, so the owner repeats the work and logs the cause once. Every 4xx is always mapped, never thrown.
 
 ## Answer closures
 
@@ -92,7 +92,7 @@ if ($fields !== []) {
 
 ## Failure forms on the wire
 
-The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 400, 401, 404, 409, 422, 500) and ships with the package. 401 and 500 answer `data: {}`.
+The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 400, 401, 403-query, 403-process, 404, 409, 422, 500) and ships with the package. 401 and 500 answer `data: {}`. An access denial is an answer, not an exception: `MapThrowable` maps it for the owner and for a nested run alike.
 
 **400** `ValidationFailure`
 
@@ -103,6 +103,14 @@ The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/
 ```
 
 The reasons of a field finding are `missing`, `invalid` (validator), `type` and `unknown` (request reader); each is answered with the key `validation.<reason>` and, when the caller delivered no text, its standard text (`Field is required.`, `Field is invalid.`, `Field has an invalid type.`, `Unknown field`). Any other reason is answered as `invalid`. `DescribeFieldFinding` is the one place of this vocabulary.
+
+**403** `Forbidden`
+
+```json
+{"status": 403, "data": {"@type": "forbidden", "context": {"right": "fulfillment.shipment:shipmentByOrderNumber"}, "messageKey": "actor.rightMissing"}}
+```
+
+The key and the context are data of the thrown `AccessDeniedExceptionInterface`; the package defines no key value.
 
 **404** `NotFound`
 
@@ -124,7 +132,7 @@ The reasons of a field finding are `missing`, `invalid` (validator), `type` and 
   "context": {"status": "closed"}}}
 ```
 
-The `messageKey` a node declared joins the data of a 404/409/400 last; the 422 form always carries its own.
+The `messageKey` a node declared joins the data of a 400/403/404/409 last; the 422 form always carries its own.
 
 ## Installation
 
@@ -132,7 +140,7 @@ The `messageKey` a node declared joins the data of a 404/409/400 last; the 422 f
 composer require jardissupport/response
 ```
 
-Requires PHP 8.3+, `jardissupport/contracts` ^2.15, `psr/log` and `psr/clock` (see Requirements). The transaction bracket (`jardissupport/repository`) and the process engine (`jardissupport/workflow`) are separate packages the door uses next to this one; this package depends on neither.
+Requires PHP 8.3+, `jardissupport/contracts` ^2.16, `psr/log` and `psr/clock` (see Requirements). The transaction bracket (`jardissupport/repository`) and the process engine (`jardissupport/workflow`) are separate packages the door uses next to this one; this package depends on neither.
 
 ## Quick Start
 
@@ -185,7 +193,7 @@ try {
 
 ## Requirements
 
-`php >=8.3`, `jardissupport/contracts ^2.15`, `psr/log ^3.0`, `psr/clock ^1.0`. The request mapper adds no dependency (ports from `contracts`). `AnswerOutcome` needs `AnswerableOutcomeInterface`, shipped since contracts 2.15. Dev: `jardissupport/validation` (the real `DateTime` validator behind the calendar accept closures in the tests), `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
+`php >=8.3`, `jardissupport/contracts ^2.16`, `psr/log ^3.0`, `psr/clock ^1.0`. The request mapper adds no dependency (ports from `contracts`). `AnswerOutcome` needs `AnswerableOutcomeInterface`, shipped since contracts 2.15. Dev: `jardissupport/validation` (the real `DateTime` validator behind the calendar accept closures in the tests), `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
 
 ## Development
 

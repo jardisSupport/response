@@ -6,6 +6,17 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-21
+
+### Added
+- Failure form 403: `Data/Failure/Forbidden` (`messageKey`, `context`, status `ResponseStatus::Forbidden`), built by `Handler/Failure/ForbiddenPayload` and mapped by `BuildFailureForm`. `BuildResponseData` answers it as `{@type: forbidden, context, messageKey}` (an empty `context` as `{}`).
+- `MapThrowable` maps `JardisSupport\Contract\Kernel\AccessDeniedExceptionInterface` to 403 with the `getMessageKey()` and `getContext()` of the exception - for the owner and for a nested run alike, never thrown on.
+- Wire contract: two new cases `403-query` and `403-process`; the 11 existing cases are byte-for-byte unchanged (the `provenance` text names the new cases). Because the file gains cases, this is a minor addition of the wire, no change of an existing byte.
+- Needs `jardissupport/contracts` 2.16 (ships `AccessDeniedExceptionInterface`); the `require` is raised to `^2.16`.
+
+### Changed
+- A node reject with the declared status 403 now answers the form (`{@type: forbidden, context, messageKey}`) instead of the flat context plus the declared key. Before, 403 had no form.
+
 ## [1.4.0] - 2026-10-21
 
 ### Added
