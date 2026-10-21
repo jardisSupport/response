@@ -6,6 +6,7 @@ namespace JardisSupport\Response\Tests\Integration\Response;
 
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Failure\Conflict;
+use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\NotFound;
 use JardisSupport\Response\Data\Failure\RuleViolation;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
@@ -178,7 +179,7 @@ class BuildResponseDataTest extends TestCase
     {
         $this->assertSame(
             ['role' => 'guest', 'messageKey' => 'order.forbidden'],
-            $this->rejectData(ResponseStatus::Forbidden, 'order.forbidden', ['role' => 'guest'])
+            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.forbidden', ['role' => 'guest'])
         );
     }
 
@@ -232,8 +233,32 @@ class BuildResponseDataTest extends TestCase
     {
         $this->assertSame(
             ['messageKey' => 'order.forbidden'],
-            $this->rejectData(ResponseStatus::Forbidden, 'order.forbidden')
+            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.forbidden')
         );
+    }
+
+    public function testForbiddenAnswersTypeContextAndItsOwnMessageKey(): void
+    {
+        $form = new Forbidden('p.denied', ['right' => 'a.b:c']);
+
+        $data = (new BuildResponseData())(ResponseStatus::Forbidden, $form, null, 'CheckoutOrder');
+
+        $this->assertSame(['@type' => 'forbidden', 'context' => ['right' => 'a.b:c'], 'messageKey' => 'p.denied'], $data);
+        $this->assertSame('messageKey', array_key_last($data));
+    }
+
+    public function testForbiddenWithoutContextAnswersAnEmptyObject(): void
+    {
+        $data = (new BuildResponseData())(ResponseStatus::Forbidden, new Forbidden('p.denied'), null, 'CheckoutOrder');
+
+        $this->assertEquals(['@type' => 'forbidden', 'context' => new stdClass(), 'messageKey' => 'p.denied'], $data);
+    }
+
+    public function testForbiddenWithADeclaredKeyKeepsOneKeyAtTheEnd(): void
+    {
+        $data = $this->rejectData(ResponseStatus::Forbidden, 'order.declared', ['right' => 'x']);
+
+        $this->assertSame(['@type' => 'forbidden', 'context' => ['right' => 'x'], 'messageKey' => 'order.declared'], $data);
     }
 
     public function testNoKeyIsDeclaredForSuccessOrAnEmptyKey(): void

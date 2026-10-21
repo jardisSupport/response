@@ -15,6 +15,7 @@ use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
 use JardisSupport\Response\Handler\Response\BuildResponseData;
 use JardisSupport\Response\Handler\Response\TransformResponse;
+use JardisSupport\Response\Tests\Support\DeniedAccess;
 use JardisSupport\Response\Tests\Support\EnvelopeCases;
 use JardisSupport\Response\Tests\Support\EnvelopeJson;
 use JardisSupport\Response\Tests\Support\Wire\QuoteInput;
@@ -26,11 +27,12 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the eleven cases 200, 200-empty (a last node without an answer of
+ * `Contract/wire-contract.json` holds, for the thirteen cases 200, 200-empty (a last node without an answer of
  * its own: `data` carries only the `@type`), 200-merged (the answer is the data of all nodes united in run order,
  * the later node wins on the same field), 200-answer-class (merged with a process answer class: the union is
  * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
- * the wire carries it in UTC), 400, 401, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
+ * the wire carries it in UTC), 400, 401, 403-query, 403-process, 404, 409, 422 and 500 (the two 403 cases are the answer of a thrown access denial,
+ * mapped by `MapThrowable`), the envelope (status, data, errors, meta)
  * of the process handler. This test drives only the door steps - `ValidateInput`, `CheckActor`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
  * with the file. The proof that a generated handler reproduces the same file is the consumer test of the
@@ -70,6 +72,8 @@ class WireContractTest extends TestCase
             ['200-datetime-offset', 200],
             ['400', 400],
             ['401', 401],
+            ['403-query', 403],
+            ['403-process', 403],
             ['404', 404],
             ['409', 409],
             ['422', 422],
@@ -90,6 +94,14 @@ class WireContractTest extends TestCase
             $cases['200-answer-class']['envelope']['data']
         );
         $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['expiresAt']);
+        $this->assertSame(
+            ['@type' => 'forbidden', 'context' => ['right' => 'fulfillment.shipment:shipmentByOrderNumber'], 'messageKey' => 'actor.rightMissing'],
+            $cases['403-query']['envelope']['data']
+        );
+        $this->assertSame(
+            ['@type' => 'forbidden', 'context' => ['kind' => 'anonymous'], 'messageKey' => 'actor.kindNotAllowed'],
+            $cases['403-process']['envelope']['data']
+        );
     }
 
     /**
@@ -100,7 +112,7 @@ class WireContractTest extends TestCase
         return [
             'contract' => 'jardissupport/workflow wire contract: the envelope per status that a generated process handler answers',
             'provenance' => [
-                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner',
+                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner; cases 403-query and 403-process: a thrown access denial mapped by MapThrowable',
                 'clock' => 'frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)',
                 'encoding' => 'EnvelopeJson::FLAGS, empty data/errors/meta as {}',
             ],
@@ -112,6 +124,8 @@ class WireContractTest extends TestCase
                 '200-datetime-offset' => $this->case('Login', 'last node answers an instant with the offset +02:00, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '401' => $this->case('VoucherRedeemCheck', 'start check: the declared actor is missing, no node runs', $this->actorMissing()),
+                '403-query' => $this->case('shipmentByOrderNumber', 'query door: the actor lacks the right of the endpoint, a thrown access denial is answered', $this->deniedRight()),
+                '403-process' => $this->case('VoucherRedeemCheck', 'process door: the kind of the actor is not allowed at the endpoint, a thrown access denial is answered', $this->deniedKind()),
                 '404' => $this->case('RegisterAndReviseServiceOptOut', 'second call node: the callee answers 404, declared key', $this->revisionTargetMissing()),
                 '409' => $this->case('RegisterAndReviseServiceOptOut', 'first call node: the callee answers 409, declared key', $this->registrationClash()),
                 '422' => $this->case('VoucherRedeemCheck', 'rule node: the voucher has no root, rule violation', $this->ruleViolation()),
@@ -139,9 +153,10 @@ class WireContractTest extends TestCase
         ResponseStatus $status,
         array $data,
         array $errors = [],
-        string $version = ''
+        string $version = '',
+        string $contextSuffix = 'Handler'
     ): DomainResponseInterface {
-        $result = new ContextResponse($process . 'Handler');
+        $result = new ContextResponse($process . $contextSuffix);
         foreach ($errors as $error) {
             $result->addError($error);
         }
@@ -265,6 +280,37 @@ class WireContractTest extends TestCase
             'VoucherRedeemCheck',
             ResponseStatus::Unauthorized,
             (new BuildResponseData())(ResponseStatus::Unauthorized, $response, null, 'VoucherRedeemCheck')
+        );
+    }
+
+    private function deniedRight(): DomainResponseInterface
+    {
+        return $this->denied(
+            'shipmentByOrderNumber',
+            '',
+            new DeniedAccess('actor.rightMissing', ['right' => 'fulfillment.shipment:shipmentByOrderNumber'])
+        );
+    }
+
+    private function deniedKind(): DomainResponseInterface
+    {
+        return $this->denied('VoucherRedeemCheck', 'Handler', new DeniedAccess('actor.kindNotAllowed', ['kind' => 'anonymous']));
+    }
+
+    /**
+     * A thrown access denial, mapped by the door step: an answer, never an exception.
+     */
+    private function denied(string $process, string $contextSuffix, DeniedAccess $denial): DomainResponseInterface
+    {
+        $mapped = (new MapThrowable())($denial, true, $process);
+
+        return $this->answer(
+            $process,
+            $mapped->status,
+            (new BuildResponseData())($mapped->status, $mapped->response, null, $process),
+            [],
+            '',
+            $contextSuffix
         );
     }
 

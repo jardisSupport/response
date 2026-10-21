@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JardisSupport\Response\Handler\Failure;
 
+use JardisSupport\Contract\Kernel\AccessDeniedExceptionInterface;
 use JardisSupport\Contract\Kernel\ConcurrencyConflictExceptionInterface;
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Contract\Kernel\ValidationExceptionInterface;
@@ -18,6 +19,7 @@ use JardisSupport\Response\Data\MappedFailure;
  * | TransientConflictException                      | 409 (`stale_write`)    | thrown on - the owner repeats the work |
  * | ConcurrencyConflictExceptionInterface (marker)  | 409 with its fields    | 409 with its fields                    |
  * | ValidationExceptionInterface (marker)           | 400 with its fields    | 400 with its fields                    |
+ * | AccessDeniedExceptionInterface (marker)         | 403 with its key       | 403 with its key                       |
  * | every other Throwable                           | 500, empty object      | thrown on                              |
  *
  * Every 4xx is always mapped, never thrown: a rejection is an answer, not an exception. Only the
@@ -62,6 +64,11 @@ final class MapThrowable
                 ResponseStatus::ValidationError,
                 self::MARKER_VALIDATION_KEY,
                 ['fields' => $failure->getFields()]
+            ),
+            $failure instanceof AccessDeniedExceptionInterface => $this->answer(
+                ResponseStatus::Forbidden,
+                $failure->getMessageKey(),
+                $failure->getContext()
             ),
             $owner => $this->answer(ResponseStatus::InternalError, ''),
             default => throw $failure,

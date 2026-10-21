@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace JardisSupport\Response\Tests\Integration\Failure;
 
+use JardisSupport\Contract\Kernel\AccessDeniedExceptionInterface;
 use JardisSupport\Contract\Kernel\ConcurrencyConflictExceptionInterface;
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Contract\Kernel\ValidationExceptionInterface;
 use JardisSupport\Contract\Repository\Exception\TransientConflictException;
 use JardisSupport\Response\Data\Failure\Conflict;
+use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Data\MappedFailure;
 use JardisSupport\Response\Exception\ConfigurationException;
@@ -78,6 +80,21 @@ class MapThrowableTest extends TestCase
                     ['field' => 'email', 'reason' => 'missing', 'message' => 'Field is required.', 'messageKey' => 'validation.missing'],
                     ['field' => 'age', 'reason' => 'invalid', 'message' => 'Must be 18 or older.', 'messageKey' => 'validation.invalid'],
                 ];
+            }
+        };
+    }
+
+    private function accessDenied(): AccessDeniedExceptionInterface
+    {
+        return new class ('denied') extends \RuntimeException implements AccessDeniedExceptionInterface {
+            public function getMessageKey(): string
+            {
+                return 'test.denied';
+            }
+
+            public function getContext(): array
+            {
+                return ['right' => 'a.b:c'];
             }
         };
     }
@@ -223,5 +240,25 @@ class MapThrowableTest extends TestCase
         $this->assertInstanceOf(ValidationFailure::class, $form);
         $this->assertSame('validation', $form->messageKey());
         $this->assertSame(self::FIELDS, $form->fields());
+    }
+
+    public function testAccessDeniedMarkerAnswers403WithKeyAndContextOfTheException(): void
+    {
+        $mapped = (new MapThrowable())($this->accessDenied(), true, 'CreateInvoice');
+
+        $this->assertSame(ResponseStatus::Forbidden, $mapped->status);
+        $this->assertEquals(new Forbidden('test.denied', ['right' => 'a.b:c']), $mapped->response);
+        $this->assertSame(
+            ['@type' => 'forbidden', 'context' => ['right' => 'a.b:c'], 'messageKey' => 'test.denied'],
+            (new BuildResponseData())($mapped->status, $mapped->response, null, 'CreateInvoice')
+        );
+    }
+
+    public function testAccessDeniedMarkerIsMappedAlsoForANonOwnerAndNeverThrown(): void
+    {
+        $mapped = (new MapThrowable())($this->accessDenied(), false, 'Inner');
+
+        $this->assertSame(ResponseStatus::Forbidden, $mapped->status);
+        $this->assertInstanceOf(Forbidden::class, $mapped->response);
     }
 }
