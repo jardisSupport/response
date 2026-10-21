@@ -51,6 +51,22 @@ $result->setData($data);
 $domainResponse = (new TransformResponse($clock, $version))($result, $status);              // {status, data, errors, meta}
 ```
 
+The same door with the answer closures (`Handler\Answer\*`) - calls and branches on what a call returns, nothing else:
+
+```php
+$findings = ($this->handle(ValidateInput::class, validator: $validator))($input);
+if ($findings->failed()) { return ($this->handle(AnswerFindings::class))($this->result(), $this->transformer(), $findings); }   // 400
+if (!($this->handle(CheckActor::class))($required, $this->actor())) { return ($this->handle(AnswerUnauthorized::class))($this->result(), $this->transformer()); }   // 401
+try {
+    // ... run in the transaction bracket -> $outcome (AnswerableOutcomeInterface), $owner
+    return ($this->handle(AnswerOutcome::class))($this->result(), $this->transformer(), $outcome, $processName);   // events, errors, data, status
+} catch (\Throwable $e) {
+    $answer = ($this->handle(AnswerThrowable::class))($this->result(), $this->transformer(), $e, $owner, $processName);   // maps, logs nothing
+    ($this->handle(LogFailure::class, logger: $logger))($e, $processName, $owner, $answer);                            // owner + 5xx only
+    return $answer;
+}
+```
+
 | Failure status | Form (`Data/Failure/`) | `data` on the wire |
 |---|---|---|
 | 400 | `ValidationFailure(messageKey, fields[], context)` | `{@type: validation, fields}` |
@@ -63,15 +79,15 @@ The wire contract `tests/Smoke/Contract/wire-contract.json` (11 cases: 200, 200-
 
 ## Full reference
 
-All 25 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 35 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
 | `Data\Response\ContextResponse` | `__construct(string $context)`; `addData(string, mixed): self`, `setData(array): self`, `getData(): array`, `addEvent(object, EventScope = Internal): self`, `getEvents(?EventScope = null): array`, `addError(string): self`, `getErrors(): array`, `addResult(ContextResponseInterface): self`, `getResults(): array` |
 | `Data\Response\DomainResponse` | `readonly`; `__construct(ResponseStatus, array $data, array $events, array $errors, array $metadata, array $eventsByScope = [])`; `isSuccess() getStatus(): int getData() getEvents(?EventScope) getErrors() getMetadata()` |
 | `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofOne(mixed $item)`; `items() total() first() isEmpty()` |
-| `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [])`; `root() children()` |
-| `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`** |
+| `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [], string $identifier = 'id')`; `root() children() identifier()` - answered as `{@type, <identifier>: root, <child key>: scalar\|null\|list}` |
+| `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`**; `failed(): bool` answers the same |
 | `Data\MappedFailure` | `final readonly`; `__construct(public ResponseStatus $status, public FailureForm\|\stdClass $response)` |
 | `Data\Failure\FailureForm` | interface: `status(): ResponseStatus`, `messageKey(): string`, `context(): array` |
 | `Data\Failure\ValidationFailure` | `__construct(string $messageKey, array $fields, array $context = [])`; `fields()` |
@@ -84,7 +100,7 @@ All 25 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Failure\ConcurrencyConflictPayload` | `__invoke(string $messageKey, string $reason, string $aggregate, array $context, array $violated): Conflict` |
 | `Handler\Failure\RuleViolationPayload` | `__invoke(string $rule, string $messageKey, array $context): RuleViolation` |
 | `Handler\Failure\BuildFailureForm` | `__construct(ValidationPayload = new, NotFoundPayload = new, ConcurrencyConflictPayload = new, RuleViolationPayload = new)`; `__invoke(ResponseStatus, string $messageKey, array $context, array $errors): ?FailureForm` - built from the context keys `fields`, `reason/aggregate/violated`, `rule`; other statuses `null` |
-| `Handler\Failure\DescribeFieldFinding` | `public const string KEY_PREFIX, REASON_MISSING, REASON_INVALID, TEXT_MISSING, TEXT_INVALID`; `__invoke(array $finding): array` - adds `messageKey` `validation.missing` / `validation.invalid` and a standard text when the validator delivered none |
+| `Handler\Failure\DescribeFieldFinding` | `public const string KEY_PREFIX, REASON_MISSING, REASON_INVALID, REASON_TYPE, REASON_UNKNOWN, TEXT_MISSING, TEXT_INVALID, TEXT_TYPE, TEXT_UNKNOWN`; `__invoke(array $finding): array` - adds `messageKey` `validation.<reason>` for `missing`/`invalid`/`type`/`unknown` (any other reason: `validation.invalid`) and the standard text of the reason when the caller delivered none |
 | `Handler\Failure\BuildFailureOutcome` | `__construct(BuildFailureForm = new)`; `__invoke(ResponseStatus, string $messageKey, array $context = [], array $errors = [], bool $declared = false): FailureForm\|\stdClass` - form of the status; 5xx `stdClass{}`; 4xx without form: `declared` -> `(object) $context`, else `{messageKey, context}` |
 | `Handler\Failure\LogCause` | `__construct(?LoggerInterface $logger)`; `__invoke(\Throwable $cause, string $process): void` - `error` log with `exception` and `process`; no logger = nothing; a cause carrying the marker `ReportedFailureExceptionInterface` (already reported where it arose, e.g. `CalleeFailureException` from workflow) is skipped; a failing logger is swallowed |
 | `Handler\Failure\MapThrowable` | `public const string CONFLICT_KEY = 'process.transientConflict'`, `CONFLICT_REASON = 'stale_write'`; `__construct(BuildFailureOutcome = new)`; `__invoke(\Throwable $failure, bool $owner, string $aggregate): MappedFailure` |
@@ -92,6 +108,16 @@ All 25 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Response\TransformResponse` | `final`; `__construct(ClockInterface $clock, string $version = '')`; `__invoke(ContextResponseInterface $result, ?ResponseStatus $status = null): DomainResponseInterface`; time only from the injected PSR-20 clock |
 | `Handler\Door\ValidateInput` | `public const string MESSAGE_KEY = 'process.inputInvalid'`; `__construct(ValidatorInterface $validator, DescribeFieldFinding = new)`; `__invoke(object $input): InputFindings`; field paths below the input root (`customer`, `items[1].qty`), root name `lcfirst(shortName)` |
 | `Handler\Door\CheckActor` | `public const string MESSAGE_KEY = 'process.actorMissing'`; `__invoke(bool $required, ?object $actor): bool` - `false` = 401 |
+| `Data\RuleResult` | `final readonly`; `pass()`, `reject(string $rule, string $messageKey, array $context = [])`; public `passed rule messageKey context` |
+| `Handler\Failure\LogFailure` | `__construct(?LoggerInterface $logger = null, ?LogCause = null)`; `__invoke(\Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void` - logs (`LogCause`) only when `$owner` and the answer is a 5xx |
+| `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
+| `Handler\Answer\AnswerUnauthorized` | `__invoke($result, $transform)` -> 401, `data: {}` |
+| `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
+| `Handler\Answer\AnswerRuleViolation` | `__invoke($result, $transform, RuleResult $rejection)` -> 422 `{@type: ruleViolation, rule, messageKey, context}` |
+| `Handler\Answer\AnswerOutcome` | `__invoke($result, $transform, AnswerableOutcomeInterface $outcome, string $processName)` - Domain events and errors into the result, then response (success) or failure form of the reject, under the outcome's status; no engine type |
+| `Handler\Answer\AnswerThrowable` | `__invoke($result, $transform, \Throwable $failure, bool $owner, string $aggregate)` - `MapThrowable` + `BuildResponseData`; throws on what is not the owner's to answer; logs nothing |
+| `Handler\Answer\AnswerCommand` | `__invoke($result, $transform, Reference $reference, string $aggregate)` - `{@type, <identifier>: root, <children>}`, status from collected errors |
+| `Handler\Answer\AnswerRead` | `__invoke($result, $transform, ReadResult $found, string $type)` - `@type` plus public fields of the first item, `[]` when empty |
 
 **MapThrowable table** (every 4xx is answered, only the owner answers a 5xx):
 
