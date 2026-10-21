@@ -5,7 +5,7 @@ Response building for one request-response use case: response objects (`ContextR
 ## Layout (`src/`)
 
 - `Data/` — `ReadResult`, `Reference`, `RuleResult`, `InputFindings`, `MappedFailure`, `Failure/*` (the four failure forms behind `FailureForm`), `Response/*` (`ContextResponse`, `DomainResponse`)
-- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Door/` (`ValidateInput`, `CheckActor`), `Answer/` (`AnswerFindings`, `AnswerUnauthorized`, `AnswerNotFound`, `AnswerRuleViolation`, `AnswerOutcome`, `AnswerThrowable`, `AnswerCommand`, `AnswerRead`), `Failure/` (payload builders, `BuildFailureForm`, `BuildFailureOutcome`, `DescribeFieldFinding`, `MapThrowable`, `LogCause`, `LogFailure`), `Response/` (`BuildResponseData`, `TransformResponse`)
+- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Door/` (`ValidateInput`, `CheckActor`), `Answer/` (`AnswerFindings`, `AnswerUnauthorized`, `AnswerNotFound`, `AnswerRuleViolation`, `AnswerOutcome`, `AnswerThrowable`, `AnswerCommand`, `AnswerRead`), `Failure/` (payload builders, `BuildFailureForm`, `BuildFailureOutcome`, `DescribeFieldFinding`, `MapThrowable`, `LogCause`, `LogFailure`), `Response/` (`BuildResponseData`, `TransformResponse`, `ProjectAnswer`)
 - `Exception/` — `ConfigurationException` (extends `\RuntimeException`)
 
 ## Commands (always `make`)
