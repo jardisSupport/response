@@ -10,7 +10,7 @@ use JardisSupport\Response\Data\Failure\FailureForm;
 /**
  * The one mapping from a reject (status, message key, context, errors) to its failure form.
  *
- * 400, 404, 409 and 422 have a form of their own, every other status has none (null). The form
+ * 400, 403, 404, 409 and 422 have a form of their own, every other status has none (null). The form
  * is built from the context keys it knows - 400 `fields`, 409 `reason`/`aggregate`/`violated`,
  * 422 `rule` - the remaining keys travel as the context of the form. A 400 without `fields`
  * reports each error text as one finding without a field name, so no message gets lost.
@@ -22,6 +22,7 @@ final class BuildFailureForm
         private readonly NotFoundPayload $notFound = new NotFoundPayload(),
         private readonly ConcurrencyConflictPayload $conflict = new ConcurrencyConflictPayload(),
         private readonly RuleViolationPayload $ruleViolation = new RuleViolationPayload(),
+        private readonly ForbiddenPayload $forbidden = new ForbiddenPayload(),
     ) {
     }
 
@@ -37,6 +38,7 @@ final class BuildFailureForm
                 $this->fields($context, $errors),
                 array_diff_key($context, ['fields' => true])
             ),
+            ResponseStatus::Forbidden => ($this->forbidden)($messageKey, $context),
             ResponseStatus::NotFound => ($this->notFound)($messageKey, $context),
             ResponseStatus::Conflict => ($this->conflict)(
                 $messageKey,
