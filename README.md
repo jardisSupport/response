@@ -9,7 +9,7 @@ Status: 1.0.0 in preparation, not released.
 | Group | Content |
 |---|---|
 | Response objects | `Data/Response/ContextResponse`, `Data/Response/DomainResponse`, `Handler/Response/TransformResponse` (context response to `DomainResponseInterface`, injected PSR-20 clock) |
-| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding, BuildRuleRejectionContext, FoldRuleSet}` |
+| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, CheckActor}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
 | Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`: each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
@@ -17,7 +17,7 @@ Status: 1.0.0 in preparation, not released.
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-37 classes, every handler `final` with exactly one public entry point (`__invoke`).
+35 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -89,15 +89,6 @@ The reasons of a field finding are `missing`, `invalid` (validator), `type` and 
 ```
 
 The `messageKey` a node declared joins the data of a 404/409/400 last; the 422 form always carries its own.
-
-A rule node that rejects hands the `context` of the 422 to the process outcome. Two closures build it, so no door or node assembles the array itself:
-
-| Closure | Call | Result |
-|---|---|---|
-| `BuildRuleRejectionContext` | `__invoke(RuleResult $rejection, ?string $set = null)` | `['rule' => $rejection->rule] + $rejection->context`; with a set name the context is folded through `FoldRuleSet` |
-| `FoldRuleSet` | `__invoke(array $context, string $set)` | `$context + ['set' => $set]` |
-
-Key order is `rule`, the keys of the rejection, `set`. `rule` wins against a context key `rule`; a context key `set` wins against the `$set` parameter (array union). Without a set there is no `set` key.
 
 ## Installation
 

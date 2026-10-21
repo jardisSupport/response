@@ -163,10 +163,6 @@ class DecouplingTest extends TestCase
             '__construct(BuildFailureForm $buildFailureForm = …)',
             '__invoke(ResponseStatus $status, string $messageKey, array $context = …, array $errors = …, bool $declared = …): FailureForm|stdClass',
         ],
-        'Handler\\Failure\\BuildRuleRejectionContext' => [
-            '__construct(FoldRuleSet $foldRuleSet = …)',
-            '__invoke(RuleResult $rejection, ?string $set = …): array',
-        ],
         'Handler\\Failure\\ConcurrencyConflictPayload' => [
             '__invoke(string $messageKey, string $reason, string $aggregate, array $context, array $violated): Conflict',
         ],
@@ -181,9 +177,6 @@ class DecouplingTest extends TestCase
             'const string TEXT_TYPE',
             'const string TEXT_UNKNOWN',
             '__invoke(array $finding): array',
-        ],
-        'Handler\\Failure\\FoldRuleSet' => [
-            '__invoke(array $context, string $set): array',
         ],
         'Handler\\Failure\\LogCause' => [
             '__construct(?LoggerInterface $logger)',
@@ -294,7 +287,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(37, $classes);
+        $this->assertCount(35, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

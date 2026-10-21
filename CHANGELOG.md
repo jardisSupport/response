@@ -13,7 +13,6 @@ versioning follows [SemVer](https://semver.org/).
 - `Data/Reference` carries the wire name of the business identifier (third constructor parameter `$identifier`, default `id`, `identifier()`); child references are answered under their keys (a single child as scalar or `null`, a child list as a list). `BuildResponseData` answers a `Reference` as `{@type, <identifier>: <root>, <children>}`.
 - `Data/RuleResult`: the outcome of a rule invocation (`pass()` / `reject(rule, messageKey, context)`), answered as 422 by `AnswerRuleViolation`.
 - `Data/InputFindings::failed()`: true when at least one field failed, so a door branches on a call instead of comparing `fields`.
-- `Handler/Failure/BuildRuleRejectionContext` and `Handler/Failure/FoldRuleSet`: the context of a 422 rule rejection as closures - `['rule' => ...] + context`, optionally folded with the rule set name (`+ ['set' => ...]`). Key order `rule`, context, `set`; `rule` wins against a context `rule`, a context `set` wins against the parameter.
 - Needs the contracts release that ships `AnswerableOutcomeInterface`; the `require` is raised with it.
 
 ## [1.1.0] - 2026-10-20
