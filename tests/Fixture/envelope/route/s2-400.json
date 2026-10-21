@@ -1,0 +1,23 @@
+{
+    "status": 400,
+    "data": {
+        "@type": "validation",
+        "fields": [
+            {
+                "field": "status",
+                "reason": "missing",
+                "message": "Field is required.",
+                "messageKey": "validation.missing"
+            }
+        ]
+    },
+    "errors": {},
+    "meta": {
+        "duration": "<elapsed>",
+        "contexts": [
+            "validation"
+        ],
+        "timestamp": "<wall clock>",
+        "version": ""
+    }
+}

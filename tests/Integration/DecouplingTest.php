@@ -121,6 +121,11 @@ class DecouplingTest extends TestCase
             '__construct(ValidationPayload $validationPayload = …, BuildResponseData $buildResponseData = …)',
             '__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings): DomainResponseInterface',
         ],
+        'Handler\\Answer\\AnswerInvalidRequest' => [
+            'const string CONTEXT',
+            '__construct(ClockInterface $clock, BuildRequestFindings $buildRequestFindings = …, AnswerFindings $answerFindings = …)',
+            '__invoke(array $fields, string $version = …): DomainResponseInterface',
+        ],
         'Handler\\Answer\\AnswerNotFound' => [
             'const string MESSAGE_KEY',
             '__construct(NotFoundPayload $notFoundPayload = …, BuildResponseData $buildResponseData = …)',
@@ -200,6 +205,84 @@ class DecouplingTest extends TestCase
         ],
         'Handler\\Failure\\ValidationPayload' => [
             '__invoke(string $messageKey, array $fields, array $context = …): ValidationFailure',
+        ],
+        'Handler\\Request\\Accept\\BodyBool' => [
+            '__invoke(mixed $value): ?bool',
+        ],
+        'Handler\\Request\\Accept\\BodyFloat' => [
+            '__invoke(mixed $value): ?float',
+        ],
+        'Handler\\Request\\Accept\\BodyInt' => [
+            '__invoke(mixed $value): ?int',
+        ],
+        'Handler\\Request\\Accept\\BodyStr' => [
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\Accept\\TransportBool' => [
+            '__invoke(mixed $value): ?bool',
+        ],
+        'Handler\\Request\\Accept\\TransportFloat' => [
+            '__invoke(mixed $value): ?float',
+        ],
+        'Handler\\Request\\Accept\\TransportInt' => [
+            '__invoke(mixed $value): ?int',
+        ],
+        'Handler\\Request\\Accept\\TransportStr' => [
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\Accept\\BodyDate' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?DateTimeImmutable',
+        ],
+        'Handler\\Request\\Accept\\BodyDateTime' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?DateTimeImmutable',
+        ],
+        'Handler\\Request\\Accept\\BodyTime' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?DateTimeImmutable',
+        ],
+        'Handler\\Request\\Accept\\TransportDate' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\Accept\\TransportDateTime' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\Accept\\TransportTime' => [
+            '__construct(ValueValidatorInterface $validator)',
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\Accept\\TransportDecimal' => [
+            'const string LEXICAL_PATTERN',
+            '__construct(string $pattern = …)',
+            '__invoke(mixed $value): ?string',
+        ],
+        'Handler\\Request\\BuildRequestFindings' => [
+            'const string REASON_MISSING',
+            'const string REASON_TYPE',
+            'const string REASON_UNKNOWN',
+            '__construct(DescribeFieldFinding $describe = …)',
+            '__invoke(array $fields): InputFindings',
+        ],
+        'Handler\\Request\\FindUnknownKeys' => [
+            '__invoke(array $source, array $known, array $fields): void',
+        ],
+        'Handler\\Request\\ReadBodyNullable' => [
+            '__invoke(array $body, string $name, callable $accept, array $fields): mixed',
+        ],
+        'Handler\\Request\\ReadRequired' => [
+            '__invoke(array $source, string $name, callable $accept, mixed $fallback, array $fields): mixed',
+        ],
+        'Handler\\Request\\ReadTransportList' => [
+            '__invoke(array $source, string $name, callable $accept, array $fields): array',
+        ],
+        'Handler\\Request\\ReadTransportOptional' => [
+            '__invoke(array $source, string $name, callable $accept, array $fields): mixed',
+        ],
+        'Handler\\Request\\RebaseFindings' => [
+            '__invoke(string $path, array $found, array $fields): void',
         ],
         'Handler\\Response\\BuildResponseData' => [
             '__invoke(ResponseStatus $status, object $response, ?string $declaredMessageKey, string $processName): array',
@@ -290,7 +373,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(36, $classes);
+        $this->assertCount(59, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

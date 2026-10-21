@@ -6,6 +6,13 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-21
+
+### Added
+- Request mapper, moved from `jardiscore/app` (behaviour unchanged, no PSR-7, no router): `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, the 15 accept closures `Handler/Request/Accept/{Body,Transport}*` and the 400 answer `Handler/Answer/AnswerInvalidRequest`. They read the path/query values and the decoded JSON body as arrays, collect every fault (`missing`, `type`, `unknown`) and answer 400 through `AnswerFindings`. Decoding the body, building the server request and resolving the class version stay in `jardiscore/app`.
+- No new runtime dependency: the six calendar accept closures (`TransportDate`, `TransportDateTime`, `TransportTime`, `BodyDate`, `BodyDateTime`, `BodyTime`) take a `JardisSupport\Contract\Validation\ValueValidatorInterface` in the constructor (the `DateTime` validator of `jardissupport/validation` judges the form), `AnswerInvalidRequest` takes a PSR-20 `ClockInterface`. Both constructor parameters are required (the former `jardiscore/app` classes created the validator and `SystemClock` themselves); the classes are therefore not creatable by `Factory::get()` without a registered instance.
+- Tests for all 23 classes, the 400 envelope pinned against the fixture `tests/Fixture/envelope/route/s2-400.json`.
+
 ## [1.3.0] - 2026-10-21
 
 ### Added

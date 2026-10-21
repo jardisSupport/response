@@ -13,11 +13,12 @@ Status: 1.0.0 in preparation, not released.
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, CheckActor}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
 | Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-36 classes, every handler `final` with exactly one public entry point (`__invoke`).
+59 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -58,6 +59,35 @@ Every closure is creatable without constructor arguments (`$this->handle(AnswerF
 
 ```php
 $outer = ($this->handle(ProjectAnswer::class))($inner, 'orderNumber');   // {@type, orderNumber}, status and events as inside
+```
+
+## Request mapper
+
+The input check of a transport that cannot rely on a typed DTO: the door reads the path/query values and the decoded JSON body as plain arrays, one closure per field, and answers every fault of the request at once. No PSR-7, no router - the closures take arrays, so a Symfony controller, a CLI command or a queue worker uses them as well as an HTTP delivery layer. (Decoding the body, building the server request and resolving the class version are transport work and stay in `jardiscore/app`.)
+
+| Closure | Does |
+|---|---|
+| `ReadRequired($source, $name, $accept, $fallback, &$fields)` | a REQUIRED value: absent is a `missing` finding, a value the accept closure refuses a `type` finding; the fallback stands in |
+| `ReadTransportOptional($source, $name, $accept, &$fields)` | an OPTIONAL path/query value: absent, `''` or `null` is "not given" (`null`) |
+| `ReadTransportList($source, $name, $accept, &$fields)` | a repeated query parameter (`?keys[]=a&keys[]=b` or one value); no element is `missing`, a refused element one `type` finding |
+| `ReadBodyNullable($body, $name, $accept, &$fields)` | a NULLABLE body value: absent or `null` is `null` |
+| `FindUnknownKeys($source, $known, &$fields)` | closes a body: every key the contract does not name is an `unknown` finding, in body order |
+| `RebaseFindings($path, $found, &$fields)` | re-labels the findings of a nested payload onto the carrying path (`items[1].qty`) |
+| `BuildRequestFindings($fields)` | the collected `{field, reason}` pairs as `InputFindings` (text and key from `DescribeFieldFinding`) |
+| `AnswerInvalidRequest($fields, $version = '')` | the one 400 answer with all findings (`AnswerFindings` under the hood), `meta.version` set |
+
+The accept closures (`Handler/Request/Accept/`) decide what a value of a source is and return the typed value or `null`: `TransportStr|Int|Float|Bool|Decimal|Date|DateTime|Time` (a path/query value is a string end to end: validated first, coerced second; `TransportDecimal` keeps the string and takes the anchored pattern as constructor argument) and `BodyStr|Int|Float|Bool|Date|DateTime|Time` (a JSON value keeps its type and is strict; `BodyDateTime` normalises to UTC, `BodyDate`/`BodyTime` hand on a `DateTimeImmutable`).
+
+Two constructor dependencies, both ports, so the package gains no runtime dependency: the six calendar closures (`TransportDate`, `TransportDateTime`, `TransportTime`, `BodyDate`, `BodyDateTime`, `BodyTime`) take a `JardisSupport\Contract\Validation\ValueValidatorInterface` and judge the form with it - pass the `DateTime` validator of `jardissupport/validation` (`new TransportDate(new DateTime())`); `AnswerInvalidRequest` takes the PSR-20 `ClockInterface` (`new AnswerInvalidRequest($clock)`). These classes are therefore not creatable by `Factory::get()` without a registered instance; the readers and all other accept closures are.
+
+```php
+$fields = [];
+$name = ($this->handle(ReadRequired::class))($body, 'name', new BodyStr(), '', $fields);
+$due  = ($this->handle(ReadBodyNullable::class))($body, 'due', new BodyDate($validator), $fields);
+($this->handle(FindUnknownKeys::class))($body, ['name', 'due'], $fields);
+if ($fields !== []) {
+    return (new AnswerInvalidRequest($clock))($fields, $version);   // 400, every fault at once
+}
 ```
 
 ## Failure forms on the wire
@@ -155,7 +185,7 @@ try {
 
 ## Requirements
 
-`php >=8.3`, `jardissupport/contracts ^2.15`, `psr/log ^3.0`, `psr/clock ^1.0`. `AnswerOutcome` needs `AnswerableOutcomeInterface`, shipped since contracts 2.15. Dev: `jardissupport/validation`, `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
+`php >=8.3`, `jardissupport/contracts ^2.15`, `psr/log ^3.0`, `psr/clock ^1.0`. The request mapper adds no dependency (ports from `contracts`). `AnswerOutcome` needs `AnswerableOutcomeInterface`, shipped since contracts 2.15. Dev: `jardissupport/validation` (the real `DateTime` validator behind the calendar accept closures in the tests), `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
 
 ## Development
 
