@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 /**
- * The package holds exactly the documented 36 classes (MODELL section 5, plus the answer closures of E2-P7 and `ProjectAnswer`): no more, no fewer, each
+ * The package holds exactly the documented 59 classes (MODELL section 5, plus the answer closures of E2-P7, `ProjectAnswer` and the request readers): no more, no fewer, each
  * one loadable under `JardisSupport\Response\...`.
  */
 class ResponseStructureTest extends TestCase
@@ -29,6 +29,7 @@ class ResponseStructureTest extends TestCase
         'Exception\\ConfigurationException',
         'Handler\\Answer\\AnswerCommand',
         'Handler\\Answer\\AnswerFindings',
+        'Handler\\Answer\\AnswerInvalidRequest',
         'Handler\\Answer\\AnswerNotFound',
         'Handler\\Answer\\AnswerOutcome',
         'Handler\\Answer\\AnswerRead',
@@ -47,6 +48,28 @@ class ResponseStructureTest extends TestCase
         'Handler\\Failure\\NotFoundPayload',
         'Handler\\Failure\\RuleViolationPayload',
         'Handler\\Failure\\ValidationPayload',
+        'Handler\\Request\\Accept\\BodyBool',
+        'Handler\\Request\\Accept\\BodyDate',
+        'Handler\\Request\\Accept\\BodyDateTime',
+        'Handler\\Request\\Accept\\BodyFloat',
+        'Handler\\Request\\Accept\\BodyInt',
+        'Handler\\Request\\Accept\\BodyStr',
+        'Handler\\Request\\Accept\\BodyTime',
+        'Handler\\Request\\Accept\\TransportBool',
+        'Handler\\Request\\Accept\\TransportDate',
+        'Handler\\Request\\Accept\\TransportDateTime',
+        'Handler\\Request\\Accept\\TransportDecimal',
+        'Handler\\Request\\Accept\\TransportFloat',
+        'Handler\\Request\\Accept\\TransportInt',
+        'Handler\\Request\\Accept\\TransportStr',
+        'Handler\\Request\\Accept\\TransportTime',
+        'Handler\\Request\\BuildRequestFindings',
+        'Handler\\Request\\FindUnknownKeys',
+        'Handler\\Request\\ReadBodyNullable',
+        'Handler\\Request\\ReadRequired',
+        'Handler\\Request\\ReadTransportList',
+        'Handler\\Request\\ReadTransportOptional',
+        'Handler\\Request\\RebaseFindings',
         'Handler\\Response\\BuildResponseData',
         'Handler\\Response\\ProjectAnswer',
         'Handler\\Response\\TransformResponse',
@@ -64,7 +87,7 @@ class ResponseStructureTest extends TestCase
         }
         sort($found);
 
-        $this->assertCount(36, self::CLASSES);
+        $this->assertCount(59, self::CLASSES);
         $this->assertSame(self::CLASSES, $found);
         foreach (self::CLASSES as $short) {
             $class = new ReflectionClass('JardisSupport\\Response\\' . $short);

@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer) and the door steps in front of a use case (ValidateInput, CheckActor, MapThrowable, LogCause). No process engine inside. Use when working with jardissupport/response, failure forms, BuildResponseData, MapThrowable, ValidateInput, CheckActor, InputFindings, MappedFailure, the response envelope, wire contract or 401/400/409 door answers.
+description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer) the door steps in front of a use case (ValidateInput, CheckActor, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, CheckActor, InputFindings, MappedFailure, the response envelope, wire contract or 401/400/409 door answers.
 user-invocable: false
 zone: post-active
 persona: C
@@ -9,11 +9,11 @@ next: [support-workflow, generated-code-workflow-api]
 ---
 
 # RESPONSE_COMPONENT_SKILL
-> `jardissupport/response` 1.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.13, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
+> `jardissupport/response` 1.4 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.13, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, CheckActor, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, CheckActor, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -77,9 +77,24 @@ try {
 
 The wire contract `tests/Smoke/Contract/wire-contract.json` (11 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 401, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
 
+## Request mapper (array-shaped input, 400 with all faults)
+
+For a transport that hands the door plain arrays (path/query values, decoded JSON body) - no PSR-7, no router. One reader per field collects `{field, reason}` findings (`missing`, `type`, `unknown`); the door answers once with all of them.
+
+```php
+$fields = [];
+$name = (new ReadRequired())($body, 'name', new BodyStr(), '', $fields);              // absent = missing, refused = type, fallback stands in
+$due  = (new ReadBodyNullable())($body, 'due', new BodyDate($validator), $fields);    // absent/null = null
+$qty  = (new ReadTransportOptional())($query, 'qty', new TransportInt(), $fields);    // absent/''/null = null
+(new FindUnknownKeys())($body, ['name', 'due'], $fields);                             // unknown keys, body order
+if ($fields !== []) { return (new AnswerInvalidRequest($clock))($fields, $version); } // 400, meta.version
+```
+
+**Constructor dependencies (ports, no new runtime dependency):** the six calendar accept closures (`TransportDate|DateTime|Time`, `BodyDate|DateTime|Time`) take a `ValueValidatorInterface` (pass the `DateTime` validator of `jardissupport/validation`); `AnswerInvalidRequest` takes a PSR-20 `ClockInterface`. Both are required, so `Factory::get()` cannot create them without a registered instance; readers and the other accept closures are creatable without arguments. Not in this package (stay in `jardiscore/app`): `ParseJsonBody`, `CreateServerRequest`, `ResolveVersion`.
+
 ## Full reference
 
-All 36 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 59 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
@@ -119,6 +134,19 @@ All 36 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Answer\AnswerThrowable` | `__invoke($result, $transform, \Throwable $failure, bool $owner, string $aggregate)` - `MapThrowable` + `BuildResponseData`; throws on what is not the owner's to answer; logs nothing |
 | `Handler\Answer\AnswerCommand` | `__invoke($result, $transform, Reference $reference, string $aggregate)` - `{@type, <identifier>: root, <children>}`, status from collected errors |
 | `Handler\Answer\AnswerRead` | `__invoke($result, $transform, ReadResult $found, string $type)` - `@type` plus public fields of the first item, `[]` when empty |
+| `Handler\Request\ReadRequired` | `__invoke(array $source, string $name, callable $accept, mixed $fallback, array &$fields): mixed` - absent = `missing`; `null` goes to the accept closure; refused = `type`; findings collected, fallback returned |
+| `Handler\Request\ReadBodyNullable` | `__invoke(array $body, string $name, callable $accept, array &$fields): mixed` - absent or `null` = `null`; refused = `type` + `null` |
+| `Handler\Request\ReadTransportOptional` | `__invoke(array $source, string $name, callable $accept, array &$fields): mixed` - absent, `''`, `null` = `null`; refused = `type` + `null` |
+| `Handler\Request\ReadTransportList` | `__invoke(array $source, string $name, callable $accept, array &$fields): array` - repeated query parameter; absent/empty = `missing`; one refused element = one `type`, list `[]` |
+| `Handler\Request\FindUnknownKeys` | `__invoke(array $source, array $known, array &$fields): void` - every key not in `$known` = `unknown`, body order |
+| `Handler\Request\RebaseFindings` | `__invoke(string $path, array $found, array &$fields): void` - `<path>.<field>` onto the carrying path |
+| `Handler\Request\BuildRequestFindings` | `public const string REASON_MISSING, REASON_TYPE, REASON_UNKNOWN`; `__construct(DescribeFieldFinding = new)`; `__invoke(array $fields): InputFindings` |
+| `Handler\Request\Accept\Transport{Str,Int,Float,Bool}` | `__invoke(mixed): ?T` - a path/query value is a string, validated first, coerced second (`Bool`: exactly `true false 1 0`) |
+| `Handler\Request\Accept\TransportDecimal` | `public const string LEXICAL_PATTERN`; `__construct(string $pattern = LEXICAL_PATTERN)`; `__invoke(mixed): ?string` - stays a string |
+| `Handler\Request\Accept\Transport{Date,DateTime,Time}` | `__construct(ValueValidatorInterface $validator)`; `__invoke(mixed): ?string` - `Y-m-d` / RFC 3339 with offset / `H:i:s`, judged by the validator, string handed on |
+| `Handler\Request\Accept\Body{Str,Int,Float,Bool}` | `__invoke(mixed): ?T` - a JSON value keeps its type (`Int` only a JSON integer, `Float` int or float) |
+| `Handler\Request\Accept\Body{Date,DateTime,Time}` | `__construct(ValueValidatorInterface $validator)`; `__invoke(mixed): ?DateTimeImmutable` - `BodyDateTime` normalised to UTC |
+| `Handler\Answer\AnswerInvalidRequest` | `public const string CONTEXT = 'validation'`; `__construct(ClockInterface $clock, BuildRequestFindings = new, AnswerFindings = new)`; `__invoke(array $fields, string $version = ''): DomainResponseInterface` - the 400 with all findings, `meta.version` |
 
 **MapThrowable table** (every 4xx is answered, only the owner answers a 5xx):
 
@@ -153,7 +181,8 @@ Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller
 | 7 | A 4xx without a failure form (401, 403, 405) answers `{messageKey, context}` unless `declared`; the key reaches the wire only when declared | `Handler/Failure/BuildFailureOutcome.php` |
 | 8 | `BuildFailureForm` cuts the context keys it knows (`fields`; `reason/aggregate/violated`; `rule`) - the rest travels as `context` of the form | `Handler/Failure/BuildFailureForm.php` |
 | 9 | `ReadResult::ofList` with `total` smaller than the items throws `\InvalidArgumentException` | `Data/ReadResult.php` |
-| 10 | The wire contract file is the one shipped test path; changing it is a breaking change of the wire (major version) | `.gitattributes`, `tests/Smoke/WireContractTest.php` |
+| 10 | A calendar accept closure without its `ValueValidatorInterface` or `AnswerInvalidRequest` without its clock does not construct - there is no default, the package has no runtime dependency on `validation`/`scheduling`; pass them (`new BodyDate(new DateTime())`, `new AnswerInvalidRequest($clock)`) | `Handler/Request/Accept/BodyDate.php`, `Handler/Answer/AnswerInvalidRequest.php` |
+| 11 | The wire contract file is the one shipped test path; changing it is a breaking change of the wire (major version) | `.gitattributes`, `tests/Smoke/WireContractTest.php` |
 
 ## Layer rules
 
