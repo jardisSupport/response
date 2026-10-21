@@ -6,6 +6,8 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-21
+
 ### Added
 - Failure form 403: `Data/Failure/Forbidden` (`messageKey`, `context`, status `ResponseStatus::Forbidden`), built by `Handler/Failure/ForbiddenPayload` and mapped by `BuildFailureForm`. `BuildResponseData` answers it as `{@type: forbidden, context, messageKey}` (an empty `context` as `{}`).
 - `MapThrowable` maps `JardisSupport\Contract\Kernel\AccessDeniedExceptionInterface` to 403 with the `getMessageKey()` and `getContext()` of the exception - for the owner and for a nested run alike, never thrown on.
