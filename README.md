@@ -96,7 +96,7 @@ The `messageKey` a node declared joins the data of a 404/409/400 last; the 422 f
 composer require jardissupport/response
 ```
 
-Requires PHP 8.3+, `jardissupport/contracts` ^2.13, `psr/log` and `psr/clock` (see Requirements). The transaction bracket (`jardissupport/repository`) and the process engine (`jardissupport/workflow`) are separate packages the door uses next to this one; this package depends on neither.
+Requires PHP 8.3+, `jardissupport/contracts` ^2.15, `psr/log` and `psr/clock` (see Requirements). The transaction bracket (`jardissupport/repository`) and the process engine (`jardissupport/workflow`) are separate packages the door uses next to this one; this package depends on neither.
 
 ## Quick Start
 
@@ -149,7 +149,7 @@ try {
 
 ## Requirements
 
-`php >=8.3`, `jardissupport/contracts ^2.13`, `psr/log ^3.0`, `psr/clock ^1.0`. `AnswerOutcome` needs the contracts release that ships `AnswerableOutcomeInterface` (the `require` is raised with that release). Dev: `jardissupport/validation`, `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
+`php >=8.3`, `jardissupport/contracts ^2.15`, `psr/log ^3.0`, `psr/clock ^1.0`. `AnswerOutcome` needs `AnswerableOutcomeInterface`, shipped since contracts 2.15. Dev: `jardissupport/validation`, `jardissupport/scheduling`, `jardissupport/factory` (proves that every answer closure is creatable by `handle()`). Never `jardissupport/workflow`.
 
 ## Development
 
