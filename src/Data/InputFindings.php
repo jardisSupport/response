@@ -21,4 +21,12 @@ final readonly class InputFindings
         public array $errors,
     ) {
     }
+
+    /**
+     * True when at least one field failed - the door then answers 400.
+     */
+    public function failed(): bool
+    {
+        return $this->fields !== [];
+    }
 }
