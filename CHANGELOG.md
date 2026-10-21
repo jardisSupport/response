@@ -6,6 +6,11 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-21
+
+### Added
+- `Handler/Response/ProjectAnswer`: cuts an answer down to its outer contract. `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - a 2xx answer keeps `@type` plus exactly the named fields that exist in its data (order as in the data, a missing field is not added, an unknown name is no error); status, errors, metadata and the events of every scope pass through unchanged. Any other status comes back as the same instance. An empty field list leaves only `@type`. The closure knows no field name of its own.
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

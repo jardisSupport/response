@@ -12,12 +12,12 @@ Status: 1.0.0 in preparation, not released.
 | Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, CheckActor}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`: each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-35 classes, every handler `final` with exactly one public entry point (`__invoke`).
+36 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -53,6 +53,12 @@ A door answers by calls only: no loop, no status comparison, no data assembly. E
 Every closure is creatable without constructor arguments (`$this->handle(AnswerFindings::class)`); the collaborators are constructor defaults. `LogFailure` takes the logger by name: `$this->handle(LogFailure::class, logger: $this->resource()->logger())`. `AnswerOutcome` reads the outcome through `JardisSupport\Contract\Kernel\AnswerableOutcomeInterface` (contracts), so the package still knows no process engine.
 
 `Reference` carries the wire name of the business identifier (`new Reference('ORD-1', [], 'orderNumber')` answers `{"@type": "order", "orderNumber": "ORD-1"}`); child references are answered under their keys - one child as its identifier (or `null`), a child list as a list. Without a name the root answers as `id`.
+
+`ProjectAnswer($response, string ...$fields)` is the outer-door closure: it cuts a finished answer down to its outer contract. Inside, an answer may carry more than the outside promises (`{@type, id, orderNumber}` inside, `{@type, orderNumber}` outside). A 2xx answer keeps `@type` plus exactly the named fields that exist in its data (order as in the data; a missing field is not added, an unknown name is no error); status, errors, metadata and the events of every scope are carried over unchanged. A non-2xx answer comes back as the same instance. The closure knows no field name of its own - only the list it is given.
+
+```php
+$outer = ($this->handle(ProjectAnswer::class))($inner, 'orderNumber');   // {@type, orderNumber}, status and events as inside
+```
 
 ## Failure forms on the wire
 
