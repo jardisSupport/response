@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference) and the door steps in front of a use case (ValidateInput, CheckActor, MapThrowable, LogCause). No process engine inside. Use when working with jardissupport/response, failure forms, BuildResponseData, MapThrowable, ValidateInput, CheckActor, InputFindings, MappedFailure, the response envelope, wire contract or 401/400/409 door answers.
+description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer) and the door steps in front of a use case (ValidateInput, CheckActor, MapThrowable, LogCause). No process engine inside. Use when working with jardissupport/response, failure forms, BuildResponseData, MapThrowable, ValidateInput, CheckActor, InputFindings, MappedFailure, the response envelope, wire contract or 401/400/409 door answers.
 user-invocable: false
 zone: post-active
 persona: C
@@ -13,7 +13,7 @@ next: [support-workflow, generated-code-workflow-api]
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, CheckActor, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, CheckActor, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -79,7 +79,7 @@ The wire contract `tests/Smoke/Contract/wire-contract.json` (11 cases: 200, 200-
 
 ## Full reference
 
-All 35 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 36 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
@@ -110,6 +110,7 @@ All 35 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Door\CheckActor` | `public const string MESSAGE_KEY = 'process.actorMissing'`; `__invoke(bool $required, ?object $actor): bool` - `false` = 401 |
 | `Data\RuleResult` | `final readonly`; `pass()`, `reject(string $rule, string $messageKey, array $context = [])`; public `passed rule messageKey context` |
 | `Handler\Failure\LogFailure` | `__construct(?LoggerInterface $logger = null, ?LogCause = null)`; `__invoke(\Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void` - logs (`LogCause`) only when `$owner` and the answer is a 5xx |
+| `Handler\Response\ProjectAnswer` | `final`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
 | `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
 | `Handler\Answer\AnswerUnauthorized` | `__invoke($result, $transform)` -> 401, `data: {}` |
 | `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |

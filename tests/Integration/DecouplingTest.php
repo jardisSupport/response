@@ -204,6 +204,9 @@ class DecouplingTest extends TestCase
         'Handler\\Response\\BuildResponseData' => [
             '__invoke(ResponseStatus $status, object $response, ?string $declaredMessageKey, string $processName): array',
         ],
+        'Handler\\Response\\ProjectAnswer' => [
+            '__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface',
+        ],
         'Handler\\Response\\TransformResponse' => [
             '__construct(ClockInterface $clock, string $version = …)',
             '__invoke(ContextResponseInterface $result, ?ResponseStatus $status = …): DomainResponseInterface',
@@ -271,7 +274,7 @@ class DecouplingTest extends TestCase
                 continue;
             }
             $parameters = array_map(
-                fn(\ReflectionParameter $p): string => $this->short($p->getType()) . ' $' . $p->getName() . ($p->isOptional() ? ' = …' : ''),
+                fn(\ReflectionParameter $p): string => $this->short($p->getType()) . ($p->isVariadic() ? ' ...$' : ' $') . $p->getName() . ($p->isOptional() && !$p->isVariadic() ? ' = …' : ''),
                 $method->getParameters()
             );
             $lines[] = ($method->isStatic() ? 'static ' : '') . $method->getName() . '(' . implode(', ', $parameters) . ')'
@@ -287,7 +290,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(35, $classes);
+        $this->assertCount(36, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
