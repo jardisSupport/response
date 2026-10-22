@@ -299,6 +299,9 @@ class DecouplingTest extends TestCase
         'Handler\\Response\\ProjectAnswer' => [
             '__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface',
         ],
+        'Handler\\Response\\ProjectRows' => [
+            '__invoke(array $rows, string ...$fields): array',
+        ],
         'Handler\\Response\\TransformResponse' => [
             '__construct(ClockInterface $clock, string $version = …)',
             '__invoke(ContextResponseInterface $result, ?ResponseStatus $status = …): DomainResponseInterface',
@@ -382,7 +385,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(61, $classes);
+        $this->assertCount(62, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

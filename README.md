@@ -12,13 +12,13 @@ Status: 1.0.0 in preparation, not released.
 | Failure forms | `Data/Failure/{FailureForm, ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, ForbiddenPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, CheckActor}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` and `Handler/Response/ProjectRows` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-61 classes, every handler `final` with exactly one public entry point (`__invoke`).
+62 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -59,6 +59,12 @@ Every closure is creatable without constructor arguments (`$this->handle(AnswerF
 
 ```php
 $outer = ($this->handle(ProjectAnswer::class))($inner, 'orderNumber');   // {@type, orderNumber}, status and events as inside
+```
+
+`ProjectRows($rows, string ...$fields)` is the same cut for the rows of a list: each row of the result holds exactly the named keys, in the order of the names; nothing is added and a `null` value stays `null`. It differs from `ProjectAnswer` on purpose - there an unknown name is no error, here a named key a row does not carry is drift between the declared contract and the data and fails loudly: `\UnexpectedValueException` with the row index and the field (the door answers it through `MapThrowable` as 500). The same exception answers `$rows` that are no list and a row that is no array; a cut without any field is a wiring error (`\InvalidArgumentException`). Like `ProjectAnswer` it knows no field name of its own.
+
+```php
+$rows = ($this->handle(ProjectRows::class))($found->items(), 'orderNumber', 'status');   // [{orderNumber, status}, ...]
 ```
 
 ## Request mapper
