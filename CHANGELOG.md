@@ -4,7 +4,10 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-22
+
+### Added
+- `Handler/Response/ProjectRows`: cuts every row of a list down to the outer contract of the list. `__invoke(array $rows, string ...$fields): array` (`list<array<string, mixed>>`) - each row keeps exactly the named keys in the order of `$fields`, nothing is added, a `null` value stays `null`. Deliberate difference to `ProjectAnswer`: a named key a row does not carry is drift, not tolerance - `\UnexpectedValueException` with the row index and the field (the door answers it through `MapThrowable` as 500); the same for `$rows` that are no list and for a row that is no array. A cut without any field throws `\InvalidArgumentException` (fail closed). The closure knows no field name of its own. Additive, `ProjectAnswer` is unchanged.
 
 ## [1.5.0] - 2026-10-21
 
