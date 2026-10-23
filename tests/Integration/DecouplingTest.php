@@ -154,12 +154,9 @@ class DecouplingTest extends TestCase
             '__invoke(ContextResponseInterface $result, TransformResponse $transform, Throwable $failure, bool $owner, string $aggregate): DomainResponseInterface',
         ],
         'Handler\\Answer\\AnswerUnauthorized' => [
+            'const string MESSAGE_KEY',
             '__construct(BuildFailureOutcome $buildFailureOutcome = …, BuildResponseData $buildResponseData = …)',
             '__invoke(ContextResponseInterface $result, TransformResponse $transform): DomainResponseInterface',
-        ],
-        'Handler\\Door\\CheckActor' => [
-            'const string MESSAGE_KEY',
-            '__invoke(bool $required, ?object $actor): bool',
         ],
         'Handler\\Door\\ValidateInput' => [
             'const string MESSAGE_KEY',
@@ -385,7 +382,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(62, $classes);
+        $this->assertCount(61, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
@@ -431,7 +428,7 @@ class DecouplingTest extends TestCase
         $this->assertTrue($kind('Exception\\ConfigurationException')->isFinal());
         $this->assertSame(\RuntimeException::class, $kind('Exception\\ConfigurationException')->getParentClass()->getName());
         $this->assertSame('process.inputInvalid', $kind('Handler\\Door\\ValidateInput')->getConstant('MESSAGE_KEY'));
-        $this->assertSame('process.actorMissing', $kind('Handler\\Door\\CheckActor')->getConstant('MESSAGE_KEY'));
+        $this->assertSame('process.actorMissing', $kind('Handler\\Answer\\AnswerUnauthorized')->getConstant('MESSAGE_KEY'));
         $this->assertSame('process.transientConflict', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_KEY'));
         $this->assertSame('stale_write', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_REASON'));
     }

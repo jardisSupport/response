@@ -9,7 +9,7 @@ use JardisSupport\Contract\Repository\Exception\TransientConflictException;
 use JardisSupport\Response\Data\Failure\FailureForm;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Exception\ConfigurationException;
-use JardisSupport\Response\Handler\Door\CheckActor;
+use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
@@ -19,7 +19,7 @@ use JardisSupport\Response\Tests\Support\Order\OrderValidation;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The failures of the package's own door steps (input, actor, thrown) never put their message key
+ * The failures of the package's own door steps (input, thrown) never put their message key
  * on the wire: the key stays on the form / response object, `data` carries the form alone or
  * nothing.
  */
@@ -35,8 +35,7 @@ class LayerFailuresOnTheWireTest extends TestCase
 
     public function testMissingActorAnswers401WithEmptyData(): void
     {
-        $this->assertFalse((new CheckActor())(true, null));
-        $response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, CheckActor::MESSAGE_KEY);
+        $response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, AnswerUnauthorized::MESSAGE_KEY);
 
         $this->assertSame('process.actorMissing', $response->messageKey, 'the key stays internal');
         $this->assertSame([], $this->data(ResponseStatus::Unauthorized, $response));

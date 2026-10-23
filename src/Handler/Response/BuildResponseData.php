@@ -28,8 +28,8 @@ use stdClass;
  * - the message key a node declared with its reject joins the data of every 4xx, the keys of the
  *   package's own door steps do not; the 422 form always carries its own; an empty `context`
  *   encodes as `{}`;
- * - another 4xx of a node (declared) passes its response fields through unchanged; one of the
- *   door steps (not declared, e.g. the missing actor) and a 5xx answer no data.
+ * - another 4xx of a node (declared) passes its response fields through unchanged; a 401 of
+ *   the door (not declared, see `AnswerUnauthorized`) and a 5xx answer no data.
  *
  * The data is not yet wire data: date values stay as they are, the projection to the wire
  * (`ProjectWire` of the data package) is the caller's step.
