@@ -4,7 +4,7 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-10-23
 
 ### Breaking
 - `Handler/Door/CheckActor` is removed. The actor is no longer a product of the process definition: the generated door reads it from the request (`$this->actor()`), and a missing session is answered by the delivery layer (`RequireSession`), so the door step `CheckActor(bool $required, ?object $actor): bool` has no caller. Migration: delete the call and the `use`; where a door still needs to answer 401, call `AnswerUnauthorized` directly.
