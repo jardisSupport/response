@@ -9,7 +9,7 @@ use DateTimeZone;
 use JardisSupport\Contract\Kernel\DomainResponseInterface;
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Response\ContextResponse;
-use JardisSupport\Response\Handler\Door\CheckActor;
+use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
@@ -33,7 +33,7 @@ use PHPUnit\Framework\TestCase;
  * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
  * the wire carries it in UTC), 400, 401, 403-query, 403-process, 404, 409, 422 and 500 (the two 403 cases are the answer of a thrown access denial,
  * mapped by `MapThrowable`), the envelope (status, data, errors, meta)
- * of the process handler. This test drives only the door steps - `ValidateInput`, `CheckActor`, `MapThrowable`,
+ * of the process handler. This test drives only the door steps - `ValidateInput`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
  * with the file. The proof that a generated handler reproduces the same file is the consumer test of the
  * builder (E4), not this one. The file ships with the package (the one `tests/` path that is not
@@ -273,8 +273,7 @@ class WireContractTest extends TestCase
 
     private function actorMissing(): DomainResponseInterface
     {
-        $this->assertFalse((new CheckActor())(true, null));
-        $response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, CheckActor::MESSAGE_KEY);
+        $response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, AnswerUnauthorized::MESSAGE_KEY);
 
         return $this->answer(
             'VoucherRedeemCheck',

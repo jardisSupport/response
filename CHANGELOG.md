@@ -4,6 +4,16 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [2.0.0] - 2026-10-23
+
+### Breaking
+- `Handler/Door/CheckActor` is removed. The actor is no longer a product of the process definition: the generated door reads it from the request (`$this->actor()`), and a missing session is answered by the delivery layer (`RequireSession`), so the door step `CheckActor(bool $required, ?object $actor): bool` has no caller. Migration: delete the call and the `use`; where a door still needs to answer 401, call `AnswerUnauthorized` directly.
+- `AnswerUnauthorized` no longer refers to `CheckActor`: the constant `MESSAGE_KEY` (value `process.actorMissing`, unchanged) now lives in `AnswerUnauthorized`. Migration: `CheckActor::MESSAGE_KEY` becomes `AnswerUnauthorized::MESSAGE_KEY`.
+
+### Unchanged
+- The wire: all 13 cases of `wire-contract.json` are byte-for-byte unchanged, among them `401` (`data: {}`, `errors: {}`; the message key stays off the wire) and `403-query`/`403-process`. `MapThrowable` (403 for `AccessDeniedExceptionInterface`), `ProjectAnswer` and `ProjectRows` are untouched.
+- Pairs with `jardissupport/workflow` 5.0.0 (the actor leaves the process engine as well).
+
 ## [1.6.0] - 2026-10-22
 
 ### Added
