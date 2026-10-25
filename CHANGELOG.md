@@ -4,6 +4,14 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [4.0.0] - 2026-10-25
+
+### Breaking
+- Wire contract: the carrier of the case `200-datetime-offset` in `wire-contract.json` changes from the process `Login` (`expiresAt`) to the process `VoucherOverview` (`vouchers[].createdAt`), because `Login` answers after RFC 6749 section 5.1 without an instant. The rule is unchanged: an instant with a non-UTC offset (`2026-01-15T12:45:00+02:00`) leaves the door in UTC (`2026-01-15T10:45:00+00:00`). The case now carries `process` `VoucherOverview`, the data `{@type: voucherOverview, vouchers: [{voucherCode, amount, note, issuedBy, issuerId, createdAt}]}` and `meta.contexts` `["VoucherOverviewHandler"]`; `provenance.source` names the builder commit of the carrier. A consumer that pins the file must pin the new bytes.
+
+### Unchanged
+- The other 9 cases (200, 200-empty, 200-merged, 200-answer-class, 400, 404, 409, 422, 500) are byte-for-byte unchanged. No class, no signature and no behaviour of `src/` changes.
+
 ## [3.0.0] - 2026-10-25
 
 ### Breaking

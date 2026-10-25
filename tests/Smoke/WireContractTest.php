@@ -87,7 +87,7 @@ class WireContractTest extends TestCase
             ['@type' => 'orderShipment', 'orderNo' => 'A-1001', 'state' => 'Shipped'],
             $cases['200-answer-class']['envelope']['data']
         );
-        $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['expiresAt']);
+        $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['vouchers'][0]['createdAt']);
     }
 
     /**
@@ -98,7 +98,7 @@ class WireContractTest extends TestCase
         return [
             'contract' => 'jardissupport/workflow wire contract: the envelope per status that a generated process handler answers',
             'provenance' => [
-                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner',
+                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit 165c9c030) run through the real runner',
                 'clock' => 'frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)',
                 'encoding' => 'EnvelopeJson::FLAGS, empty data/errors/meta as {}',
             ],
@@ -107,7 +107,7 @@ class WireContractTest extends TestCase
                 '200-empty' => $this->case('VoucherRedeemCheck', 'rule node is the last node and answers no data of its own, the answer is empty', $this->successWithoutAnswer()),
                 '200-merged' => $this->case('OrderQuoteSummary', 'two action nodes, the answer is the data of both united in run order, the later node wins on the same field', $this->successMerged()),
                 '200-answer-class' => $this->case('OrderShipment', 'merged with a process answer class: the last node is a sub-process with a foreign answer, only the declared fields reach the wire', $this->successAnswerClass()),
-                '200-datetime-offset' => $this->case('Login', 'last node answers an instant with the offset +02:00, the wire carries it in UTC', $this->successWithOffsetDate()),
+                '200-datetime-offset' => $this->case('VoucherOverview', 'last node answers an instant with the offset +02:00 in vouchers[].createdAt, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '404' => $this->case('RegisterAndReviseServiceOptOut', 'second call node: the callee answers 404, declared key', $this->revisionTargetMissing()),
                 '409' => $this->case('RegisterAndReviseServiceOptOut', 'first call node: the callee answers 409, declared key', $this->registrationClash()),
@@ -224,15 +224,21 @@ class WireContractTest extends TestCase
     private function successWithOffsetDate(): DomainResponseInterface
     {
         $response = (object) [
-            'accessToken' => 'access-token-1',
-            'refreshToken' => 'refresh-token-1',
-            'expiresAt' => new DateTimeImmutable('2026-01-15T12:45:00+02:00'),
-            'tenants' => ['acme', 'globex'],
+            'vouchers' => [[
+                'voucherCode' => 'V-100',
+                'amount' => '25.00',
+                'note' => null,
+                'issuedBy' => 'sales',
+                'issuerId' => 'u-1',
+                'createdAt' => new DateTimeImmutable('2026-01-15T12:45:00+02:00'),
+            ]],
         ];
-        $data = (new BuildResponseData())(ResponseStatus::Success, $response, null, 'Login');
-        $data['expiresAt'] = $data['expiresAt']->setTimezone(new DateTimeZone('UTC'))->format(DATE_ATOM);
+        $data = (new BuildResponseData())(ResponseStatus::Success, $response, null, 'VoucherOverview');
+        $data['vouchers'][0]['createdAt'] = $data['vouchers'][0]['createdAt']
+            ->setTimezone(new DateTimeZone('UTC'))
+            ->format(DATE_ATOM);
 
-        return $this->answer('Login', ResponseStatus::Success, $data);
+        return $this->answer('VoucherOverview', ResponseStatus::Success, $data);
     }
 
     private function invalidInput(): DomainResponseInterface
