@@ -10,7 +10,6 @@ use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Contract\Kernel\ValidationExceptionInterface;
 use JardisSupport\Contract\Repository\Exception\TransientConflictException;
 use JardisSupport\Response\Data\Failure\Conflict;
-use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Data\MappedFailure;
 use JardisSupport\Response\Exception\ConfigurationException;
@@ -20,7 +19,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * MapThrowable is the one table from a thrown failure to the answer: one test per row (W11), the
- * owner rule (a nested run throws only the stale write and 5xx causes on) and both markers.
+ * owner rule (a nested run throws only the stale write and 5xx causes on) and the two markers; the
+ * retired access marker is an unknown failure like any other.
  */
 class MapThrowableTest extends TestCase
 {
@@ -242,23 +242,21 @@ class MapThrowableTest extends TestCase
         $this->assertSame(self::FIELDS, $form->fields());
     }
 
-    public function testAccessDeniedMarkerAnswers403WithKeyAndContextOfTheException(): void
+    public function testTheRetiredAccessMarkerIsAnUnknownFailureAnd500ForTheOwner(): void
     {
         $mapped = (new MapThrowable())($this->accessDenied(), true, 'CreateInvoice');
 
-        $this->assertSame(ResponseStatus::Forbidden, $mapped->status);
-        $this->assertEquals(new Forbidden('test.denied', ['right' => 'a.b:c']), $mapped->response);
-        $this->assertSame(
-            ['@type' => 'forbidden', 'context' => ['right' => 'a.b:c'], 'messageKey' => 'test.denied'],
-            (new BuildResponseData())($mapped->status, $mapped->response, null, 'CreateInvoice')
-        );
+        $this->assertSame(ResponseStatus::InternalError, $mapped->status);
+        $this->assertEquals(new \stdClass(), $mapped->response);
+        $this->assertSame([], (new BuildResponseData())($mapped->status, $mapped->response, null, 'CreateInvoice'));
     }
 
-    public function testAccessDeniedMarkerIsMappedAlsoForANonOwnerAndNeverThrown(): void
+    public function testTheRetiredAccessMarkerIsThrownOnByANonOwner(): void
     {
-        $mapped = (new MapThrowable())($this->accessDenied(), false, 'Inner');
+        $denied = $this->accessDenied();
 
-        $this->assertSame(ResponseStatus::Forbidden, $mapped->status);
-        $this->assertInstanceOf(Forbidden::class, $mapped->response);
+        $this->expectExceptionObject($denied);
+
+        (new MapThrowable())($denied, false, 'Inner');
     }
 }

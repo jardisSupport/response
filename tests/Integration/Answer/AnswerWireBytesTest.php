@@ -14,7 +14,6 @@ use JardisSupport\Response\Handler\Answer\AnswerNotFound;
 use JardisSupport\Response\Handler\Answer\AnswerOutcome;
 use JardisSupport\Response\Handler\Answer\AnswerRuleViolation;
 use JardisSupport\Response\Handler\Answer\AnswerThrowable;
-use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Tests\Support\EnvelopeJson;
 use JardisSupport\Response\Tests\Support\Outcome\AnswerHarness;
@@ -45,13 +44,6 @@ class AnswerWireBytesTest extends TestCase
         $answer = (new AnswerFindings())(AnswerHarness::result('OrderBulkQuoteHandler'), AnswerHarness::transform(), $findings);
 
         $this->assertWire('400', $answer);
-    }
-
-    public function testAnswerUnauthorizedReproducesTheWire401(): void
-    {
-        $answer = (new AnswerUnauthorized())(AnswerHarness::result('VoucherRedeemCheckHandler'), AnswerHarness::transform());
-
-        $this->assertWire('401', $answer);
     }
 
     public function testAnswerOutcomeReproducesTheDeclaredRejectsOfTheWire(): void

@@ -6,12 +6,12 @@ namespace JardisSupport\Response\Tests\Integration\Response;
 
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Failure\Conflict;
-use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\NotFound;
 use JardisSupport\Response\Data\Failure\RuleViolation;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Response\BuildResponseData;
+use JardisSupport\Response\Tests\Support\Outcome\AnswerHarness;
 use JardisSupport\Response\Tests\Support\Response\ReserveStockResponse;
 use stdClass;
 
@@ -178,8 +178,8 @@ class BuildResponseDataTest extends TestCase
     public function testOtherClientErrorPassesItsResponseThroughWithoutType(): void
     {
         $this->assertSame(
-            ['role' => 'guest', 'messageKey' => 'order.forbidden'],
-            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.forbidden', ['role' => 'guest'])
+            ['role' => 'guest', 'messageKey' => 'order.refused'],
+            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.refused', ['role' => 'guest'])
         );
     }
 
@@ -232,33 +232,46 @@ class BuildResponseDataTest extends TestCase
     public function testDeclaredKeyOfAClientErrorWithoutFormIsKept(): void
     {
         $this->assertSame(
-            ['messageKey' => 'order.forbidden'],
-            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.forbidden')
+            ['messageKey' => 'order.refused'],
+            $this->rejectData(ResponseStatus::MethodNotAllowed, 'order.refused')
         );
     }
 
-    public function testForbiddenAnswersTypeContextAndItsOwnMessageKey(): void
+    public function testARejectOf401Or403WithADeclaredKeyStaysFlatLikeAnyOtherClientError(): void
     {
-        $form = new Forbidden('p.denied', ['right' => 'a.b:c']);
+        foreach ([ResponseStatus::Unauthorized, ResponseStatus::from(403)] as $status) {
+            $data = $this->rejectData($status, 'access.credentialsInvalid');
 
-        $data = (new BuildResponseData())(ResponseStatus::Forbidden, $form, null, 'CheckoutOrder');
-
-        $this->assertSame(['@type' => 'forbidden', 'context' => ['right' => 'a.b:c'], 'messageKey' => 'p.denied'], $data);
-        $this->assertSame('messageKey', array_key_last($data));
+            $this->assertSame(['messageKey' => 'access.credentialsInvalid'], $data, (string) $status->value);
+        }
     }
 
-    public function testForbiddenWithoutContextAnswersAnEmptyObject(): void
+    public function testTheLoginReject401KeepsItsEnvelopeBytes(): void
     {
-        $data = (new BuildResponseData())(ResponseStatus::Forbidden, new Forbidden('p.denied'), null, 'CheckoutOrder');
+        $result = AnswerHarness::result('LoginHandler');
+        $result->setData($this->rejectData(ResponseStatus::Unauthorized, 'access.credentialsInvalid'));
+        $answer = AnswerHarness::transform()($result, ResponseStatus::Unauthorized);
 
-        $this->assertEquals(['@type' => 'forbidden', 'context' => new stdClass(), 'messageKey' => 'p.denied'], $data);
-    }
-
-    public function testForbiddenWithADeclaredKeyKeepsOneKeyAtTheEnd(): void
-    {
-        $data = $this->rejectData(ResponseStatus::Forbidden, 'order.declared', ['right' => 'x']);
-
-        $this->assertSame(['@type' => 'forbidden', 'context' => ['right' => 'x'], 'messageKey' => 'order.declared'], $data);
+        $this->assertSame(
+            <<<'JSON'
+            {
+                "status": 401,
+                "data": {
+                    "messageKey": "access.credentialsInvalid"
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "LoginHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+            JSON,
+            AnswerHarness::bytes($answer)
+        );
     }
 
     public function testNoKeyIsDeclaredForSuccessOrAnEmptyKey(): void

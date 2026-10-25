@@ -18,7 +18,6 @@ use JardisSupport\Response\Handler\Answer\AnswerOutcome;
 use JardisSupport\Response\Handler\Answer\AnswerRead;
 use JardisSupport\Response\Handler\Answer\AnswerRuleViolation;
 use JardisSupport\Response\Handler\Answer\AnswerThrowable;
-use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Tests\Support\Outcome\AnswerHarness;
 use JardisSupport\Response\Tests\Support\Outcome\FakeOutcome;
 use PHPUnit\Framework\TestCase;
@@ -38,14 +37,6 @@ class AnswerBehaviourTest extends TestCase
         $this->assertSame(400, $answer->getStatus());
         $this->assertSame(['@type' => 'validation', 'fields' => $fields], $answer->getData());
         $this->assertSame(['PlaceOrderHandler' => ['email is required']], $answer->getErrors());
-    }
-
-    public function testUnauthorizedAnswers401WithoutData(): void
-    {
-        $answer = (new AnswerUnauthorized())(AnswerHarness::result('X'), AnswerHarness::transform());
-
-        $this->assertSame(401, $answer->getStatus());
-        $this->assertSame([], $answer->getData());
     }
 
     public function testNotFoundAnswers404WithTheLookupAsContext(): void

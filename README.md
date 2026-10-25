@@ -9,16 +9,16 @@ Status: 1.0.0 in preparation, not released.
 | Group | Content |
 |---|---|
 | Response objects | `Data/Response/ContextResponse`, `Data/Response/DomainResponse`, `Handler/Response/TransformResponse` (context response to `DomainResponseInterface`, injected PSR-20 clock) |
-| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, ForbiddenPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
+| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/ValidateInput`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerUnauthorized, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` and `Handler/Response/ProjectRows` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` and `Handler/Response/ProjectRows` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-61 classes, every handler `final` with exactly one public entry point (`__invoke`).
+58 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -31,7 +31,7 @@ The door of a use case (the generated handler) composes the steps. The package s
 | 3 | `MapThrowable`, `LogCause` | maps a thrown failure to status and response; logs a 5xx cause (skips a cause marked as already reported) | `MappedFailure {status, response}`; `LogCause` returns nothing |
 | 4 | `BuildResponseData`, `TransformResponse` | the `data` of the envelope, then the `DomainResponse` | `{status, data, errors, meta}` |
 
-`MapThrowable` knows the owner: `$owner = true` (no transaction was open on entry) answers a stale write with 409, the three contract markers (`ConcurrencyConflictExceptionInterface` with 409, `ValidationExceptionInterface` with 400, `AccessDeniedExceptionInterface` with 403 - its `getMessageKey()` and `getContext()` become the key and context of the form) with their own fields and everything else with 500. `$owner = false` (a nested run) throws only the `TransientConflictException` and 5xx causes on, so the owner repeats the work and logs the cause once. Every 4xx is always mapped, never thrown.
+`MapThrowable` knows the owner: `$owner = true` (no transaction was open on entry) answers a stale write with 409, the two contract markers (`ConcurrencyConflictExceptionInterface` with 409, `ValidationExceptionInterface` with 400) with their own fields and everything else with 500 - an access denial is no case of its own any more: the delivery layer (`jardiscore/app`, `RequireRight`) answers 403 before the domain runs, so a thrown denial is an unknown failure. `$owner = false` (a nested run) throws only the `TransientConflictException` and 5xx causes on, so the owner repeats the work and logs the cause once. Every 4xx is always mapped, never thrown.
 
 ## Answer closures
 
@@ -40,7 +40,6 @@ A door answers by calls only: no loop, no status comparison, no data assembly. E
 | Closure | Situation | Status |
 |---|---|---|
 | `AnswerFindings($result, $transform, InputFindings)` | the input check found failing fields | 400 |
-| `AnswerUnauthorized($result, $transform)` | the request carries no actor (the door in front found none: a missing session) | 401 |
 | `AnswerNotFound($result, $transform, array $context)` | the addressed aggregate does not exist | 404 |
 | `AnswerRuleViolation($result, $transform, RuleResult)` | a business rule rejected the request | 422 |
 | `AnswerOutcome($result, $transform, AnswerableOutcomeInterface, string $processName)` | a process run ended: its Domain events and errors, then the response (200) or the failure form of the reject (4xx) | outcome status |
@@ -97,7 +96,7 @@ if ($fields !== []) {
 
 ## Failure forms on the wire
 
-The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 400, 401, 403-query, 403-process, 404, 409, 422, 500) and ships with the package. 401 and 500 answer `data: {}`. An access denial is an answer, not an exception: `MapThrowable` maps it for the owner and for a nested run alike.
+The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 404, 409, 422, 500) and ships with the package. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
 
 **400** `ValidationFailure`
 
@@ -108,14 +107,6 @@ The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/
 ```
 
 The reasons of a field finding are `missing`, `invalid` (validator), `type` and `unknown` (request reader); each is answered with the key `validation.<reason>` and, when the caller delivered no text, its standard text (`Field is required.`, `Field is invalid.`, `Field has an invalid type.`, `Unknown field`). Any other reason is answered as `invalid`. `DescribeFieldFinding` is the one place of this vocabulary.
-
-**403** `Forbidden`
-
-```json
-{"status": 403, "data": {"@type": "forbidden", "context": {"right": "fulfillment.shipment:shipmentByOrderNumber"}, "messageKey": "actor.rightMissing"}}
-```
-
-The key and the context are data of the thrown `AccessDeniedExceptionInterface`; the package defines no key value.
 
 **404** `NotFound`
 
@@ -137,7 +128,7 @@ The key and the context are data of the thrown `AccessDeniedExceptionInterface`;
   "context": {"status": "closed"}}}
 ```
 
-The `messageKey` a node declared joins the data of a 400/403/404/409 last; the 422 form always carries its own.
+The `messageKey` a node declared joins the data of a 400/404/409 last; the 422 form always carries its own.
 
 ## Installation
 
