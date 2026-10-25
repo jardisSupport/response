@@ -70,7 +70,7 @@ try {
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
 | 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
 
 ## Request mapper (array-shaped input, 400 with all faults)
 

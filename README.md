@@ -96,7 +96,7 @@ if ($fields !== []) {
 
 ## Failure forms on the wire
 
-The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 404, 409, 422, 500) and ships with the package. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
+The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: the process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) and ships with the package. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
 
 **400** `ValidationFailure`
 
