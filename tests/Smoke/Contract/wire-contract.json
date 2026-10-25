@@ -1,7 +1,7 @@
 {
     "contract": "jardissupport/workflow wire contract: the envelope per status that a generated process handler answers",
     "provenance": {
-        "source": "tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner",
+        "source": "tests/Smoke/Fixture (copies of the generat, builder commit 165c9c030) run through the real runner",
         "clock": "frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)",
         "encoding": "EnvelopeJson::FLAGS, empty data/errors/meta as {}"
     },
@@ -92,25 +92,28 @@
             }
         },
         "200-datetime-offset": {
-            "process": "Login",
-            "scenario": "last node answers an instant with the offset +02:00, the wire carries it in UTC",
+            "process": "VoucherOverview",
+            "scenario": "last node answers an instant with the offset +02:00 in vouchers[].createdAt, the wire carries it in UTC",
             "envelope": {
                 "status": 200,
                 "data": {
-                    "@type": "login",
-                    "accessToken": "access-token-1",
-                    "refreshToken": "refresh-token-1",
-                    "expiresAt": "2026-01-15T10:45:00+00:00",
-                    "tenants": [
-                        "acme",
-                        "globex"
+                    "@type": "voucherOverview",
+                    "vouchers": [
+                        {
+                            "voucherCode": "V-100",
+                            "amount": "25.00",
+                            "note": null,
+                            "issuedBy": "sales",
+                            "issuerId": "u-1",
+                            "createdAt": "2026-01-15T10:45:00+00:00"
+                        }
                     ]
                 },
                 "errors": {},
                 "meta": {
                     "duration": 0.0,
                     "contexts": [
-                        "LoginHandler"
+                        "VoucherOverviewHandler"
                     ],
                     "timestamp": "2026-01-15T10:30:00+00:00",
                     "version": ""
