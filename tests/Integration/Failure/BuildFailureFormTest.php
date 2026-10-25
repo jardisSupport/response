@@ -6,14 +6,12 @@ namespace JardisSupport\Response\Tests\Integration\Failure;
 
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Failure\Conflict;
-use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\NotFound;
 use JardisSupport\Response\Data\Failure\RuleViolation;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Handler\Failure\BuildFailureForm;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\ConcurrencyConflictPayload;
-use JardisSupport\Response\Handler\Failure\ForbiddenPayload;
 use JardisSupport\Response\Handler\Failure\NotFoundPayload;
 use JardisSupport\Response\Handler\Failure\RuleViolationPayload;
 use JardisSupport\Response\Handler\Failure\ValidationPayload;
@@ -94,28 +92,11 @@ class BuildFailureFormTest extends TestCase
         $this->assertEquals(new RuleViolation('Open', 'r.key', ['id' => 7]), $rule);
     }
 
-    public function testForbiddenPayloadBuildsTheForbiddenForm(): void
-    {
-        $form = (new ForbiddenPayload())('p.denied', ['right' => 'a.b:c']);
-
-        $this->assertInstanceOf(Forbidden::class, $form);
-        $this->assertSame(ResponseStatus::Forbidden, $form->status());
-        $this->assertSame('p.denied', $form->messageKey());
-        $this->assertSame(['right' => 'a.b:c'], $form->context());
-    }
-
-    public function testBuildFailureFormMapsForbiddenToItsFormWithTheWholeContext(): void
-    {
-        $form = (new BuildFailureForm())(ResponseStatus::Forbidden, 'p.denied', ['kind' => 'anonymous'], []);
-
-        $this->assertEquals(new Forbidden('p.denied', ['kind' => 'anonymous']), $form);
-    }
-
     public function testStatusesWithoutAFormGiveNull(): void
     {
         $build = new BuildFailureForm();
 
-        foreach ([ResponseStatus::Unauthorized, ResponseStatus::MethodNotAllowed] as $status) {
+        foreach ([ResponseStatus::Unauthorized, ResponseStatus::from(403), ResponseStatus::MethodNotAllowed] as $status) {
             $this->assertNull($build($status, 'k', [], []), $status->name);
         }
     }
@@ -168,21 +149,21 @@ class BuildFailureFormTest extends TestCase
 
     public function testRejectWithoutAFormAnswersItsContextAsFlatData(): void
     {
-        $response = (new BuildFailureOutcome())(ResponseStatus::MethodNotAllowed, 'p.forbidden', ['role' => 'guest'], [], true);
+        $response = (new BuildFailureOutcome())(ResponseStatus::MethodNotAllowed, 'p.refused', ['role' => 'guest'], [], true);
 
         $this->assertEquals((object) ['role' => 'guest'], $response);
         $this->assertSame(
-            ['role' => 'guest', 'messageKey' => 'p.forbidden'],
-            (new BuildResponseData())(ResponseStatus::MethodNotAllowed, $response, 'p.forbidden', 'P'),
+            ['role' => 'guest', 'messageKey' => 'p.refused'],
+            (new BuildResponseData())(ResponseStatus::MethodNotAllowed, $response, 'p.refused', 'P'),
             'the declared key joins the data last, see BuildResponseData'
         );
     }
 
     public function testAnUndeclaredRejectWithoutAFormAnswersKeyAndContext(): void
     {
-        $response = (new BuildFailureOutcome())(ResponseStatus::MethodNotAllowed, 'p.forbidden', ['role' => 'guest']);
+        $response = (new BuildFailureOutcome())(ResponseStatus::MethodNotAllowed, 'p.refused', ['role' => 'guest']);
 
-        $this->assertEquals((object) ['messageKey' => 'p.forbidden', 'context' => ['role' => 'guest']], $response);
+        $this->assertEquals((object) ['messageKey' => 'p.refused', 'context' => ['role' => 'guest']], $response);
     }
 
     public function testA5xxAnswersAnEmptyObjectEvenWithAContext(): void

@@ -4,6 +4,19 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## [3.0.0] - 2026-10-25
+
+### Breaking
+- The package no longer produces a 401 or a 403. The right of a route is decided by the delivery layer before the domain runs (`jardiscore/app` 3.0: `RequireSession` answers 401, `RequireRight` answers 403), so the answer forms of the actor leave the package.
+- Removed: `Data/Failure/Forbidden`, `Handler/Failure/ForbiddenPayload` and the 403 arm of `BuildFailureForm` (status 403 has no failure form any more: `null`, like every other status without a form), and the 403 form of `BuildResponseData` (`{@type: forbidden, context, messageKey}`). The package holds 58 classes (was 61).
+- Removed: `Handler/Answer/AnswerUnauthorized` (with `MESSAGE_KEY` `process.actorMissing`). Migration: a missing session is answered by `RequireSession` of the delivery layer; where a node must reject with 401 (for example a failed login), it rejects with the declared status 401 and a declared key - the reject stays flat like any other 4xx (`{messageKey}`), as before.
+- `MapThrowable` no longer knows `AccessDeniedExceptionInterface`: a thrown access denial is an unknown failure - the owner answers 500 (empty object), a nested run throws it on. Migration: the denial is decided in the delivery layer (`RequireRight` in `jardiscore/app` 3.0), not thrown in the domain.
+
+### Changed
+- Wire contract: the cases `401`, `403-query` and `403-process` are removed from `wire-contract.json`; the 10 remaining cases (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 404, 409, 422, 500) are byte-for-byte unchanged, only the `provenance` text lost the naming of the 403 cases. A consumer that pins the file must pin the new bytes.
+- A node reject with the declared status 401 or 403 answers the flat context plus the declared key (`BuildResponseData`, "other 4xx declared"), pinned by tests with the bytes of the 401 envelope.
+- `jardissupport/contracts ^2.16` is unchanged (the marker `AccessDeniedExceptionInterface` is deprecated there since 2.17.0 and unused here).
+
 ## [2.0.0] - 2026-10-23
 
 ### Breaking

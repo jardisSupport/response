@@ -1,7 +1,7 @@
 {
     "contract": "jardissupport/workflow wire contract: the envelope per status that a generated process handler answers",
     "provenance": {
-        "source": "tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner; cases 403-query and 403-process: a thrown access denial mapped by MapThrowable",
+        "source": "tests/Smoke/Fixture (copies of the generat, builder commit df33f2953) run through the real runner",
         "clock": "frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)",
         "encoding": "EnvelopeJson::FLAGS, empty data/errors/meta as {}"
     },
@@ -156,69 +156,6 @@
                     "duration": 0.0,
                     "contexts": [
                         "OrderBulkQuoteHandler"
-                    ],
-                    "timestamp": "2026-01-15T10:30:00+00:00",
-                    "version": ""
-                }
-            }
-        },
-        "401": {
-            "process": "VoucherRedeemCheck",
-            "scenario": "start check: the declared actor is missing, no node runs",
-            "envelope": {
-                "status": 401,
-                "data": {},
-                "errors": {},
-                "meta": {
-                    "duration": 0.0,
-                    "contexts": [
-                        "VoucherRedeemCheckHandler"
-                    ],
-                    "timestamp": "2026-01-15T10:30:00+00:00",
-                    "version": ""
-                }
-            }
-        },
-        "403-query": {
-            "process": "shipmentByOrderNumber",
-            "scenario": "query door: the actor lacks the right of the endpoint, a thrown access denial is answered",
-            "envelope": {
-                "status": 403,
-                "data": {
-                    "@type": "forbidden",
-                    "context": {
-                        "right": "fulfillment.shipment:shipmentByOrderNumber"
-                    },
-                    "messageKey": "actor.rightMissing"
-                },
-                "errors": {},
-                "meta": {
-                    "duration": 0.0,
-                    "contexts": [
-                        "shipmentByOrderNumber"
-                    ],
-                    "timestamp": "2026-01-15T10:30:00+00:00",
-                    "version": ""
-                }
-            }
-        },
-        "403-process": {
-            "process": "VoucherRedeemCheck",
-            "scenario": "process door: the kind of the actor is not allowed at the endpoint, a thrown access denial is answered",
-            "envelope": {
-                "status": 403,
-                "data": {
-                    "@type": "forbidden",
-                    "context": {
-                        "kind": "anonymous"
-                    },
-                    "messageKey": "actor.kindNotAllowed"
-                },
-                "errors": {},
-                "meta": {
-                    "duration": 0.0,
-                    "contexts": [
-                        "VoucherRedeemCheckHandler"
                     ],
                     "timestamp": "2026-01-15T10:30:00+00:00",
                     "version": ""

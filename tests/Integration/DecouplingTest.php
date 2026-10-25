@@ -37,12 +37,6 @@ class DecouplingTest extends TestCase
             'messageKey(): string',
             'context(): array',
         ],
-        'Data\\Failure\\Forbidden' => [
-            '__construct(string $messageKey, array $context = …)',
-            'status(): ResponseStatus',
-            'messageKey(): string',
-            'context(): array',
-        ],
         'Data\\Failure\\NotFound' => [
             '__construct(string $messageKey, array $context = …)',
             'status(): ResponseStatus',
@@ -153,18 +147,13 @@ class DecouplingTest extends TestCase
             '__construct(MapThrowable $mapThrowable = …, BuildResponseData $buildResponseData = …)',
             '__invoke(ContextResponseInterface $result, TransformResponse $transform, Throwable $failure, bool $owner, string $aggregate): DomainResponseInterface',
         ],
-        'Handler\\Answer\\AnswerUnauthorized' => [
-            'const string MESSAGE_KEY',
-            '__construct(BuildFailureOutcome $buildFailureOutcome = …, BuildResponseData $buildResponseData = …)',
-            '__invoke(ContextResponseInterface $result, TransformResponse $transform): DomainResponseInterface',
-        ],
         'Handler\\Door\\ValidateInput' => [
             'const string MESSAGE_KEY',
             '__construct(ValidatorInterface $validator, DescribeFieldFinding $describeFieldFinding = …)',
             '__invoke(object $input): InputFindings',
         ],
         'Handler\\Failure\\BuildFailureForm' => [
-            '__construct(ValidationPayload $validation = …, NotFoundPayload $notFound = …, ConcurrencyConflictPayload $conflict = …, RuleViolationPayload $ruleViolation = …, ForbiddenPayload $forbidden = …)',
+            '__construct(ValidationPayload $validation = …, NotFoundPayload $notFound = …, ConcurrencyConflictPayload $conflict = …, RuleViolationPayload $ruleViolation = …)',
             '__invoke(ResponseStatus $status, string $messageKey, array $context, array $errors): ?FailureForm',
         ],
         'Handler\\Failure\\BuildFailureOutcome' => [
@@ -185,9 +174,6 @@ class DecouplingTest extends TestCase
             'const string TEXT_TYPE',
             'const string TEXT_UNKNOWN',
             '__invoke(array $finding): array',
-        ],
-        'Handler\\Failure\\ForbiddenPayload' => [
-            '__invoke(string $messageKey, array $context): Forbidden',
         ],
         'Handler\\Failure\\LogCause' => [
             '__construct(?LoggerInterface $logger)',
@@ -382,7 +368,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(61, $classes);
+        $this->assertCount(58, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
@@ -428,7 +414,6 @@ class DecouplingTest extends TestCase
         $this->assertTrue($kind('Exception\\ConfigurationException')->isFinal());
         $this->assertSame(\RuntimeException::class, $kind('Exception\\ConfigurationException')->getParentClass()->getName());
         $this->assertSame('process.inputInvalid', $kind('Handler\\Door\\ValidateInput')->getConstant('MESSAGE_KEY'));
-        $this->assertSame('process.actorMissing', $kind('Handler\\Answer\\AnswerUnauthorized')->getConstant('MESSAGE_KEY'));
         $this->assertSame('process.transientConflict', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_KEY'));
         $this->assertSame('stale_write', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_REASON'));
     }

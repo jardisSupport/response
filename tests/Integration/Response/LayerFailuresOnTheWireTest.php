@@ -9,7 +9,6 @@ use JardisSupport\Contract\Repository\Exception\TransientConflictException;
 use JardisSupport\Response\Data\Failure\FailureForm;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
 use JardisSupport\Response\Exception\ConfigurationException;
-use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
@@ -31,15 +30,6 @@ class LayerFailuresOnTheWireTest extends TestCase
     private function data(ResponseStatus $status, FailureForm|\stdClass $response): array
     {
         return (new BuildResponseData())($status, $response, null, 'P');
-    }
-
-    public function testMissingActorAnswers401WithEmptyData(): void
-    {
-        $response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, AnswerUnauthorized::MESSAGE_KEY);
-
-        $this->assertSame('process.actorMissing', $response->messageKey, 'the key stays internal');
-        $this->assertSame([], $this->data(ResponseStatus::Unauthorized, $response));
-        $this->assertSame('{}', json_encode((object) $this->data(ResponseStatus::Unauthorized, $response)));
     }
 
     public function testInvalidInputAnswers400WithTheFormAlone(): void
