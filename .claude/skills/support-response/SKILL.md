@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows) the door steps in front of a use case (ValidateInput, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 401/400/409 door answers.
+description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows) the door steps in front of a use case (ValidateInput, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
 user-invocable: false
 zone: post-active
 persona: C
@@ -32,8 +32,7 @@ if ($findings->fields !== []) {
         ['fields' => $findings->fields], $findings->errors);            // ValidationFailure
 }
 
-// 401: no actor on the request (the delivery layer's RequireSession answers it; a door answers it by hand)
-$response = (new BuildFailureOutcome())(ResponseStatus::Unauthorized, AnswerUnauthorized::MESSAGE_KEY);
+// 401 and 403 are not made here: the delivery layer answers them (RequireSession, RequireRight)
 
 // ③ a thrown failure
 try { /* the use case */ } catch (\Throwable $failure) {
@@ -69,10 +68,9 @@ try {
 | 404 | `NotFound(messageKey, context)` | `{@type: notFound, context}` |
 | 409 | `Conflict(messageKey, context, reason, aggregate, violated)` | `{@type: concurrencyConflict, reason, aggregate, context, violated}` |
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
-| 403 | `Forbidden(messageKey, context)` | `{@type: forbidden, context, messageKey}` |
-| 401 / 500 | none (`stdClass`) | `{}` |
+| 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (13 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 401, 403-query, 403-process, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset, 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
 
 ## Request mapper (array-shaped input, 400 with all faults)
 
@@ -91,7 +89,7 @@ if ($fields !== []) { return (new AnswerInvalidRequest($clock))($fields, $versio
 
 ## Full reference
 
-All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 58 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
@@ -103,17 +101,15 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Data\MappedFailure` | `final readonly`; `__construct(public ResponseStatus $status, public FailureForm\|\stdClass $response)` |
 | `Data\Failure\FailureForm` | interface: `status(): ResponseStatus`, `messageKey(): string`, `context(): array` |
 | `Data\Failure\ValidationFailure` | `__construct(string $messageKey, array $fields, array $context = [])`; `fields()` |
-| `Data\Failure\Forbidden` | `__construct(string $messageKey, array $context = [])` |
 | `Data\Failure\NotFound` | `__construct(string $messageKey, array $context = [])` |
 | `Data\Failure\Conflict` | `__construct(string $messageKey, array $context = [], ?string $reason = null, ?string $aggregate = null, array $violated = [])`; `reason() aggregate() violated()` |
 | `Data\Failure\RuleViolation` | `__construct(string $rule, string $messageKey, array $context = [])`; `rule()` |
 | `Exception\ConfigurationException` | `final`, extends `\RuntimeException` - unusable runtime wiring (generated `requires` lines) |
 | `Handler\Failure\ValidationPayload` | `__invoke(string $messageKey, array $fields, array $context = []): ValidationFailure` |
-| `Handler\Failure\ForbiddenPayload` | `__invoke(string $messageKey, array $context): Forbidden` |
 | `Handler\Failure\NotFoundPayload` | `__invoke(string $messageKey, array $context): NotFound` |
 | `Handler\Failure\ConcurrencyConflictPayload` | `__invoke(string $messageKey, string $reason, string $aggregate, array $context, array $violated): Conflict` |
 | `Handler\Failure\RuleViolationPayload` | `__invoke(string $rule, string $messageKey, array $context): RuleViolation` |
-| `Handler\Failure\BuildFailureForm` | `__construct(ValidationPayload = new, NotFoundPayload = new, ConcurrencyConflictPayload = new, RuleViolationPayload = new, ForbiddenPayload = new)`; `__invoke(ResponseStatus, string $messageKey, array $context, array $errors): ?FailureForm` - built from the context keys `fields`, `reason/aggregate/violated`, `rule`; 403 and 404 take the whole context; other statuses `null` |
+| `Handler\Failure\BuildFailureForm` | `__construct(ValidationPayload = new, NotFoundPayload = new, ConcurrencyConflictPayload = new, RuleViolationPayload = new)`; `__invoke(ResponseStatus, string $messageKey, array $context, array $errors): ?FailureForm` - built from the context keys `fields`, `reason/aggregate/violated`, `rule`; 404 takes the whole context; other statuses `null` |
 | `Handler\Failure\DescribeFieldFinding` | `public const string KEY_PREFIX, REASON_MISSING, REASON_INVALID, REASON_TYPE, REASON_UNKNOWN, TEXT_MISSING, TEXT_INVALID, TEXT_TYPE, TEXT_UNKNOWN`; `__invoke(array $finding): array` - adds `messageKey` `validation.<reason>` for `missing`/`invalid`/`type`/`unknown` (any other reason: `validation.invalid`) and the standard text of the reason when the caller delivered none |
 | `Handler\Failure\BuildFailureOutcome` | `__construct(BuildFailureForm = new)`; `__invoke(ResponseStatus, string $messageKey, array $context = [], array $errors = [], bool $declared = false): FailureForm\|\stdClass` - form of the status; 5xx `stdClass{}`; 4xx without form: `declared` -> `(object) $context`, else `{messageKey, context}` |
 | `Handler\Failure\LogCause` | `__construct(?LoggerInterface $logger)`; `__invoke(\Throwable $cause, string $process): void` - `error` log with `exception` and `process`; no logger = nothing; a cause carrying the marker `ReportedFailureExceptionInterface` (already reported where it arose, e.g. `CalleeFailureException` from workflow) is skipped; a failing logger is swallowed |
@@ -126,7 +122,6 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Response\ProjectAnswer` | `final`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
 | `Handler\Response\ProjectRows` | `final`; `__invoke(array $rows, string ...$fields): array` (`list<array<string,mixed>>`) - row cut of a list: each row keeps exactly the named keys in `$fields` order, nothing added, `null` stays; **unlike `ProjectAnswer` a missing key is drift**: `\UnexpectedValueException` with row index and field (also `$rows` no list, row no array) -> `MapThrowable` 500; empty `$fields` -> `\InvalidArgumentException`; knows no field name of its own |
 | `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
-| `Handler\Answer\AnswerUnauthorized` | `public const string MESSAGE_KEY = 'process.actorMissing'`; `__invoke($result, $transform)` -> 401, `data: {}` |
 | `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
 | `Handler\Answer\AnswerRuleViolation` | `__invoke($result, $transform, RuleResult $rejection)` -> 422 `{@type: ruleViolation, rule, messageKey, context}` |
 | `Handler\Answer\AnswerOutcome` | `__invoke($result, $transform, AnswerableOutcomeInterface $outcome, string $processName)` - Domain events and errors into the result, then response (success) or failure form of the reject, under the outcome's status; no engine type |
@@ -154,16 +149,15 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `TransientConflictException` | 409 `Conflict(CONFLICT_KEY, reason: CONFLICT_REASON, aggregate)` | thrown on - the owner repeats the unit of work |
 | `ConcurrencyConflictExceptionInterface` (contracts marker) | 409 with `getReason/getAggregate/getContext/getViolated`, key `concurrencyConflict` | the same 409 |
 | `ValidationExceptionInterface` (contracts marker) | 400 `ValidationFailure` with `getFields()`, key `validation` | the same 400 |
-| `AccessDeniedExceptionInterface` (contracts marker) | 403 `Forbidden` with `getMessageKey()`/`getContext()` of the exception | the same 403 |
-| any other `\Throwable` | 500, empty `stdClass` (cause via `LogCause`) | thrown on |
+| any other `\Throwable` (an access denial, too: the delivery layer answers 403 before the domain runs) | 500, empty `stdClass` (cause via `LogCause`) | thrown on |
 
 **BuildResponseData per answer:**
 
 | Answer | `data` |
 |---|---|
 | 2xx | `@type` (process name, first letter lower case) + public fields of the response |
-| 400/403/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 403 and 422 always carry their own; an empty `context` is `{}` |
-| other 4xx | declared: the response fields as given plus the key; undeclared (e.g. the 401 of the door): `[]` |
+| 400/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
+| other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` |
 | 5xx | `[]` |
 
 Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller's step through `jardissupport/data` `ProjectWire` (from 1.4.0).
@@ -173,12 +167,12 @@ Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller
 | # | Pitfall | Evidence |
 |---|---------|----------|
 | 1 | The package never imports the process engine (M5); the door step results are plain values (`InputFindings`, `MappedFailure`, `bool`) | `tests/Integration/DecouplingTest.php` |
-| 2 | `MapThrowable` with `$owner = false` throws only `TransientConflictException` and 5xx causes; it never throws a 4xx - markers (conflict, validation, access denied) are always mapped (a rejection is an answer, not an exception) | `Handler/Failure/MapThrowable.php` match arms |
+| 2 | `MapThrowable` with `$owner = false` throws only `TransientConflictException` and 5xx causes; it never throws a 4xx - markers (conflict, validation) are always mapped (a rejection is an answer, not an exception) | `Handler/Failure/MapThrowable.php` match arms |
 | 3 | The owner is decided by the caller (no transaction open on entry), not by the package; `LogCause` logs what it is given - call it once, only for the owner and only for a 5xx; a cause with the marker `ReportedFailureExceptionInterface` is skipped (already reported) | `Handler/Failure/LogCause.php` |
 | 4 | Valid input is exactly `fields === []`; `errors` is only the validator's texts. A result that is invalid but yields no field findings reads as valid | `Data/InputFindings.php`, `Handler/Door/ValidateInput.php` |
-| 5 | `AnswerUnauthorized` answers the 401 of a request without an actor (`data: {}`, the key `process.actorMissing` stays off the wire); whether the actor may act (403) is the use case's decision (thrown as `AccessDeniedExceptionInterface`, answered by `MapThrowable`) | `Handler/Answer/AnswerUnauthorized.php` |
+| 5 | The package produces no 401 and no 403 (3.0.0): the delivery layer answers them before the domain runs; a node reject with the declared status 401/403 is flat like any other 4xx; a thrown access marker is an unknown failure (500 for the owner) | `Handler/Response/BuildResponseData.php`, `Handler/Failure/MapThrowable.php` |
 | 6 | `BuildResponseData` does not project dates; hand the result to `ProjectWire` before the envelope | `Handler/Response/BuildResponseData.php` docblock |
-| 7 | A 4xx without a failure form (401, 405) answers `{messageKey, context}` unless `declared`; the key reaches the wire only when declared | `Handler/Failure/BuildFailureOutcome.php` |
+| 7 | A 4xx without a failure form (401, 403, 405) answers `{messageKey, context}` unless `declared`; the key reaches the wire only when declared | `Handler/Failure/BuildFailureOutcome.php` |
 | 8 | `BuildFailureForm` cuts the context keys it knows (`fields`; `reason/aggregate/violated`; `rule`) - the rest travels as `context` of the form | `Handler/Failure/BuildFailureForm.php` |
 | 9 | `ReadResult::ofList` with `total` smaller than the items throws `\InvalidArgumentException` | `Data/ReadResult.php` |
 | 10 | A calendar accept closure without its `ValueValidatorInterface` or `AnswerInvalidRequest` without its clock does not construct - there is no default, the package has no runtime dependency on `validation`/`scheduling`; pass them (`new BodyDate(new DateTime())`, `new AnswerInvalidRequest($clock)`) | `Handler/Request/Accept/BodyDate.php`, `Handler/Answer/AnswerInvalidRequest.php` |

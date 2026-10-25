@@ -12,7 +12,6 @@ use JardisSupport\Response\Handler\Answer\AnswerOutcome;
 use JardisSupport\Response\Handler\Answer\AnswerRead;
 use JardisSupport\Response\Handler\Answer\AnswerRuleViolation;
 use JardisSupport\Response\Handler\Answer\AnswerThrowable;
-use JardisSupport\Response\Handler\Answer\AnswerUnauthorized;
 use JardisSupport\Response\Handler\Failure\LogFailure;
 use PHPUnit\Framework\TestCase;
 
@@ -30,7 +29,6 @@ class FactoryCreatableTest extends TestCase
     {
         $classes = [
             AnswerFindings::class,
-            AnswerUnauthorized::class,
             AnswerNotFound::class,
             AnswerRuleViolation::class,
             AnswerOutcome::class,

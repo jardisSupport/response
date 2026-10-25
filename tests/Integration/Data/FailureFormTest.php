@@ -7,7 +7,6 @@ namespace JardisSupport\Response\Tests\Integration\Data;
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Failure\Conflict;
 use JardisSupport\Response\Data\Failure\FailureForm;
-use JardisSupport\Response\Data\Failure\Forbidden;
 use JardisSupport\Response\Data\Failure\NotFound;
 use JardisSupport\Response\Data\Failure\RuleViolation;
 use JardisSupport\Response\Data\Failure\ValidationFailure;
@@ -30,18 +29,6 @@ class FailureFormTest extends TestCase
         $this->assertSame('input.invalid', $failure->messageKey());
         $this->assertSame(['form' => 'signup'], $failure->context());
         $this->assertSame($fields, $failure->fields());
-        $this->assertFinalReadonly($failure);
-    }
-
-    public function testForbiddenIs403(): void
-    {
-        $failure = new Forbidden('p.denied', ['right' => 'a.b:c']);
-
-        $this->assertInstanceOf(FailureForm::class, $failure);
-        $this->assertSame(ResponseStatus::Forbidden, $failure->status());
-        $this->assertSame('p.denied', $failure->messageKey());
-        $this->assertSame(['right' => 'a.b:c'], $failure->context());
-        $this->assertSame([], (new Forbidden('p.denied'))->context());
         $this->assertFinalReadonly($failure);
     }
 
