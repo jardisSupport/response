@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace JardisSupport\Response\Handler\Response;
 
 use JardisSupport\Contract\Kernel\DomainResponseInterface;
-use JardisSupport\Contract\Kernel\EventScope;
-use JardisSupport\Contract\Kernel\ResponseStatus;
-use JardisSupport\Response\Data\Response\DomainResponse;
 
 /**
  * Cuts the answer of a use case down to its outer contract.
@@ -19,38 +16,27 @@ use JardisSupport\Response\Data\Response\DomainResponse;
  * not in the data is not added; an unknown name is no error. Every answer that
  * is not 2xx is returned as the very same instance.
  *
- * The closure knows no field name of its own - only the list it is given.
+ * The closure knows no field name of its own - only the list it is given. The rebuild of the answer
+ * is {@see ReshapeAnswer}'s; this closure only supplies the filter.
  *
  * Atomic closure - one entry point.
  */
 final class ProjectAnswer
 {
+    public function __construct(
+        private readonly ReshapeAnswer $reshapeAnswer = new ReshapeAnswer(),
+    ) {
+    }
+
     public function __invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface
     {
-        $status = $response->getStatus();
-        if ($status < 200 || $status >= 300) {
-            return $response;
-        }
-
-        $eventsByScope = [];
-        foreach (EventScope::cases() as $scope) {
-            $scoped = $response->getEvents($scope);
-            if ($scoped !== []) {
-                $eventsByScope[$scope->value] = $scoped;
-            }
-        }
-
-        return new DomainResponse(
-            ResponseStatus::from($status),
-            array_filter(
-                $response->getData(),
+        return ($this->reshapeAnswer)(
+            $response,
+            static fn (array $data): array => array_filter(
+                $data,
                 static fn (string|int $name): bool => $name === '@type' || in_array($name, $fields, true),
                 ARRAY_FILTER_USE_KEY
-            ),
-            [],
-            $response->getErrors(),
-            $response->getMetadata(),
-            $eventsByScope
+            )
         );
     }
 }

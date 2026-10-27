@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows) the door steps in front of a use case (ValidateInput, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
+description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
 user-invocable: false
 zone: post-active
 persona: C
@@ -13,7 +13,7 @@ next: [support-workflow, generated-code-workflow-api]
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -89,7 +89,7 @@ if ($fields !== []) { return (new AnswerInvalidRequest($clock))($fields, $versio
 
 ## Full reference
 
-All 58 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
@@ -119,8 +119,11 @@ All 58 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Door\ValidateInput` | `public const string MESSAGE_KEY = 'process.inputInvalid'`; `__construct(ValidatorInterface $validator, DescribeFieldFinding = new)`; `__invoke(object $input): InputFindings`; field paths below the input root (`customer`, `items[1].qty`), root name `lcfirst(shortName)` |
 | `Data\RuleResult` | `final readonly`; `pass()`, `reject(string $rule, string $messageKey, array $context = [])`; public `passed rule messageKey context` |
 | `Handler\Failure\LogFailure` | `__construct(?LoggerInterface $logger = null, ?LogCause = null)`; `__invoke(\Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void` - logs (`LogCause`) only when `$owner` and the answer is a 5xx |
-| `Handler\Response\ProjectAnswer` | `final`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
+| `Handler\Response\ProjectAnswer` | `final`; `__construct(ReshapeAnswer = new)`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
 | `Handler\Response\ProjectRows` | `final`; `__invoke(array $rows, string ...$fields): array` (`list<array<string,mixed>>`) - row cut of a list: each row keeps exactly the named keys in `$fields` order, nothing added, `null` stays; **unlike `ProjectAnswer` a missing key is drift**: `\UnexpectedValueException` with row index and field (also `$rows` no list, row no array) -> `MapThrowable` 500; empty `$fields` -> `\InvalidArgumentException`; knows no field name of its own |
+| `Handler\Response\ReshapeAnswer` | `final`; `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - 2xx: new `DomainResponse` with `$step(data)`, status/errors/metadata/events of every scope carried over; non-2xx = the same instance, step not called; knows no field name; `ProjectAnswer` is built on it |
+| `Handler\Response\ProjectAnswerRows` | `final`; `__construct(ReshapeAnswer = new, ProjectRows = new)`; `__invoke(DomainResponseInterface $response, array $cuts): DomainResponseInterface` - `$cuts` field => row keys; each field cut with `ProjectRows` (missing row key -> `\UnexpectedValueException`); missing or `null` field skipped without error; non-2xx = the same instance |
+| `Handler\Door\RequireResource` | `final`; `__invoke(?object $resource, string $name): object` - `null` -> `ConfigurationException('Required resource "<name>" is not provided by the kernel')`, else the same object |
 | `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
 | `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
 | `Handler\Answer\AnswerRuleViolation` | `__invoke($result, $transform, RuleResult $rejection)` -> 422 `{@type: ruleViolation, rule, messageKey, context}` |

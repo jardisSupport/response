@@ -147,6 +147,9 @@ class DecouplingTest extends TestCase
             '__construct(MapThrowable $mapThrowable = …, BuildResponseData $buildResponseData = …)',
             '__invoke(ContextResponseInterface $result, TransformResponse $transform, Throwable $failure, bool $owner, string $aggregate): DomainResponseInterface',
         ],
+        'Handler\\Door\\RequireResource' => [
+            '__invoke(?object $resource, string $name): object',
+        ],
         'Handler\\Door\\ValidateInput' => [
             'const string MESSAGE_KEY',
             '__construct(ValidatorInterface $validator, DescribeFieldFinding $describeFieldFinding = …)',
@@ -280,10 +283,18 @@ class DecouplingTest extends TestCase
             '__invoke(ResponseStatus $status, object $response, ?string $declaredMessageKey, string $processName): array',
         ],
         'Handler\\Response\\ProjectAnswer' => [
+            '__construct(ReshapeAnswer $reshapeAnswer = …)',
             '__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface',
+        ],
+        'Handler\\Response\\ProjectAnswerRows' => [
+            '__construct(ReshapeAnswer $reshapeAnswer = …, ProjectRows $projectRows = …)',
+            '__invoke(DomainResponseInterface $response, array $cuts): DomainResponseInterface',
         ],
         'Handler\\Response\\ProjectRows' => [
             '__invoke(array $rows, string ...$fields): array',
+        ],
+        'Handler\\Response\\ReshapeAnswer' => [
+            '__invoke(DomainResponseInterface $response, Closure $step): DomainResponseInterface',
         ],
         'Handler\\Response\\TransformResponse' => [
             '__construct(ClockInterface $clock, string $version = …)',
@@ -368,7 +379,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(58, $classes);
+        $this->assertCount(61, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
