@@ -4,7 +4,7 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## 4.1.0 — unreleased
+## 4.1.0 — 2026-10-28
 
 ### Added
 - `Handler/Response/ReshapeAnswer`: `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - reshapes the `data` of a 2xx answer with the step of the caller; status, errors, metadata and the events of every scope are carried over, every answer that is not 2xx comes back as the very same instance (the step is not called). The closure knows no field name.
