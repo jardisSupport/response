@@ -4,6 +4,19 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.1.0 — 2026-10-28
+
+### Added
+- `Handler/Response/ReshapeAnswer`: `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - reshapes the `data` of a 2xx answer with the step of the caller; status, errors, metadata and the events of every scope are carried over, every answer that is not 2xx comes back as the very same instance (the step is not called). The closure knows no field name.
+- `Handler/Response/ProjectAnswerRows`: `__invoke(DomainResponseInterface $response, array $cuts): DomainResponseInterface` - `$cuts` maps a field of the answer data to the row keys of that list; each field is cut with `ProjectRows` (a row that lacks a named key throws `\UnexpectedValueException`, as there). A field that is not in the data or is `null` is skipped without error; non-2xx comes back as the same instance. Built on `ReshapeAnswer`.
+- `Handler/Door/RequireResource`: `__invoke(?object $resource, string $name): object` - door step; `null` raises `ConfigurationException` with `Required resource "<name>" is not provided by the kernel`, otherwise the very same object comes back. The package holds 61 classes (was 58).
+
+### Changed
+- `ProjectAnswer` rebuilds the answer through `ReshapeAnswer` (constructor injection with a default instance, decorator); behaviour and `__invoke` signature are unchanged, the constructor is new and optional.
+
+### Unchanged
+- The wire: `wire-contract.json` is byte-for-byte unchanged.
+
 ## [4.0.0] - 2026-10-25
 
 ### Breaking

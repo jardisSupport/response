@@ -11,14 +11,14 @@ Status: 1.0.0 in preparation, not released.
 | Response objects | `Data/Response/ContextResponse`, `Data/Response/DomainResponse`, `Handler/Response/TransformResponse` (context response to `DomainResponseInterface`, injected PSR-20 clock) |
 | Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
-| Door steps | `Handler/Door/ValidateInput`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/ProjectAnswer` and `Handler/Response/ProjectRows` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Door steps | `Handler/Door/{ValidateInput, RequireResource}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-58 classes, every handler `final` with exactly one public entry point (`__invoke`).
+61 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -64,6 +64,16 @@ $outer = ($this->handle(ProjectAnswer::class))($inner, 'orderNumber');   // {@ty
 ```php
 $rows = ($this->handle(ProjectRows::class))($found->items(), 'orderNumber', 'status');   // [{orderNumber, status}, ...]
 ```
+
+`ReshapeAnswer($response, \Closure $step)` reshapes the `data` of a 2xx answer: the step receives the data and returns the new data; status, errors, metadata and the events of every scope are carried over. A non-2xx answer comes back as the same instance and the step is not called. `ProjectAnswer` is built on it (one rebuild for both). The closure knows no field name - what the data becomes is the step's business.
+
+`ProjectAnswerRows($response, array $cuts)` cuts the rows of lists inside a 2xx answer: `$cuts` maps a field of the data to the row keys that list keeps, each field is cut with `ProjectRows` (a row lacking a named key fails loudly with `\UnexpectedValueException`). A field that is not in the data or is `null` is skipped without error; other fields pass unchanged; non-2xx is the same instance.
+
+```php
+$outer = ($this->handle(ProjectAnswerRows::class))($inner, ['orders' => ['orderNumber', 'status']]);
+```
+
+`RequireResource($resource, string $name)` is a door step: a resource the kernel does not provide (`null`) raises `ConfigurationException` (`Required resource "<name>" is not provided by the kernel`, the door answers it through `MapThrowable` as 500); otherwise the very same object comes back.
 
 ## Request mapper
 

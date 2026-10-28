@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 /**
- * The package holds exactly the documented 58 classes (MODELL section 5, plus the answer closures of E2-P7, `ProjectAnswer`, `ProjectRows` and the request readers): no more, no fewer, each
+ * The package holds exactly the documented 61 classes (MODELL section 5, plus the answer closures of E2-P7, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`, `RequireResource` and the request readers): no more, no fewer, each
  * one loadable under `JardisSupport\Response\...`.
  */
 class ResponseStructureTest extends TestCase
@@ -35,6 +35,7 @@ class ResponseStructureTest extends TestCase
         'Handler\\Answer\\AnswerRead',
         'Handler\\Answer\\AnswerRuleViolation',
         'Handler\\Answer\\AnswerThrowable',
+        'Handler\\Door\\RequireResource',
         'Handler\\Door\\ValidateInput',
         'Handler\\Failure\\BuildFailureForm',
         'Handler\\Failure\\BuildFailureOutcome',
@@ -70,7 +71,9 @@ class ResponseStructureTest extends TestCase
         'Handler\\Request\\RebaseFindings',
         'Handler\\Response\\BuildResponseData',
         'Handler\\Response\\ProjectAnswer',
+        'Handler\\Response\\ProjectAnswerRows',
         'Handler\\Response\\ProjectRows',
+        'Handler\\Response\\ReshapeAnswer',
         'Handler\\Response\\TransformResponse',
     ];
 
@@ -86,7 +89,7 @@ class ResponseStructureTest extends TestCase
         }
         sort($found);
 
-        $this->assertCount(58, self::CLASSES);
+        $this->assertCount(61, self::CLASSES);
         $this->assertSame(self::CLASSES, $found);
         foreach (self::CLASSES as $short) {
             $class = new ReflectionClass('JardisSupport\\Response\\' . $short);
