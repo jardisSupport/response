@@ -18,7 +18,7 @@ Status: 1.0.0 in preparation, not released.
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-61 classes, every handler `final` with exactly one public entry point (`__invoke`).
+63 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -71,6 +71,15 @@ $rows = ($this->handle(ProjectRows::class))($found->items(), 'orderNumber', 'sta
 
 ```php
 $outer = ($this->handle(ProjectAnswerRows::class))($inner, ['orders' => ['orderNumber', 'status']]);
+```
+
+`ProjectOutcome($response, array $forms)` cuts the 2xx answer of a process to the outcome that ran: the data carries the marker `@outcome` (`ProjectOutcome::KEY`, the same literal as `MarkOutcome::KEY` of `workflow`), `$forms` maps each outcome name to an `OutcomeForm(fields, rowCuts)`. The answer keeps `@type`, `@outcome` and exactly the fields of that form in the form's order (a field of another form is gone, a missing field is not added) and the rows are cut by the form's `rowCuts`. Built on `ReshapeAnswer` and `ProjectAnswerRows`; non-2xx is the same instance; a 2xx answer without `@outcome` or with an unknown outcome raises `ConfigurationException`. The form carries names only - the projection of values to the wire stays the caller's step (`ProjectWire` of the data package).
+
+```php
+$outer = ($this->handle(ProjectOutcome::class))($inner, [
+    'released' => new OutcomeForm(['orderNumbers', 'invoiceNumber']),
+    'deferred' => new OutcomeForm(['reason']),
+]);
 ```
 
 `RequireResource($resource, string $name)` is a door step: a resource the kernel does not provide (`null`) raises `ConfigurationException` (`Required resource "<name>" is not provided by the kernel`, the door answers it through `MapThrowable` as 500); otherwise the very same object comes back.
