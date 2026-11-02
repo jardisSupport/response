@@ -66,14 +66,14 @@ class AnswerWireBytesTest extends TestCase
     {
         $quote = new FakeOutcome(
             ResponseStatus::Success,
-            (object) ['lineCount' => 2, 'discountedLines' => 1, 'city' => 'Berlin', 'voucherCount' => 3]
+            (object) ['@outcome' => 'priceBulkQuote', 'lineCount' => 2, 'discountedLines' => 1, 'city' => 'Berlin', 'voucherCount' => 3]
         );
-        $empty = new FakeOutcome(ResponseStatus::Success);
+        $empty = new FakeOutcome(ResponseStatus::Success, (object) ['@outcome' => 'checkVoucherRedeemable']);
         $merged = new FakeOutcome(
             ResponseStatus::Success,
-            (object) ['currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50']
+            (object) ['@outcome' => 'quoteSummary', 'currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50']
         );
-        $shipment = new FakeOutcome(ResponseStatus::Success, (object) ['orderNo' => 'A-1001', 'state' => 'Shipped']);
+        $shipment = new FakeOutcome(ResponseStatus::Success, (object) ['@outcome' => 'shipped', 'orderNo' => 'A-1001', 'state' => 'Shipped']);
 
         $this->assertWire('200', $this->outcome('OrderBulkQuoteHandler', $quote, 'OrderBulkQuote', 'v1'));
         $this->assertWire('200-empty', $this->outcome('VoucherRedeemCheckHandler', $empty, 'VoucherRedeemCheck'));

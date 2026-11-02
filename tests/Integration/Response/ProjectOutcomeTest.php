@@ -23,17 +23,17 @@ class ProjectOutcomeTest extends TestCase
     public function testDataKeepsTypeOutcomeAndTheFieldsOfTheFormInFormOrderByteExact(): void
     {
         $inner = $this->answer([
-            '@type' => 'releaseOrder',
-            '@outcome' => 'released',
-            'invoiceNumber' => 'INV-1',
-            'orderNumbers' => ['O-1'],
+            '@type' => 'sampleProcess',
+            '@outcome' => 'accepted',
+            'reference' => 'REF-1',
+            'items' => ['I-1'],
             'reason' => 'internal',
         ]);
 
         $outer = (new ProjectOutcome())($inner, $this->forms());
 
         $this->assertSame(
-            '{"@type":"releaseOrder","@outcome":"released","orderNumbers":["O-1"],"invoiceNumber":"INV-1"}',
+            '{"@type":"sampleProcess","@outcome":"accepted","items":["I-1"],"reference":"REF-1"}',
             json_encode($outer->getData(), JSON_THROW_ON_ERROR)
         );
     }
@@ -41,24 +41,24 @@ class ProjectOutcomeTest extends TestCase
     public function testAFieldOfAnotherFormIsGone(): void
     {
         $inner = $this->answer([
-            '@type' => 'releaseOrder',
+            '@type' => 'sampleProcess',
             '@outcome' => 'deferred',
             'reason' => 'timeout',
-            'invoiceNumber' => 'INV-1',
-            'orderNumbers' => ['O-1'],
+            'reference' => 'REF-1',
+            'items' => ['I-1'],
         ]);
 
         $outer = (new ProjectOutcome())($inner, $this->forms());
 
         $this->assertSame(
-            ['@type' => 'releaseOrder', '@outcome' => 'deferred', 'reason' => 'timeout'],
+            ['@type' => 'sampleProcess', '@outcome' => 'deferred', 'reason' => 'timeout'],
             $outer->getData()
         );
     }
 
     public function testUnknownOutcomeIsAConfigurationFault(): void
     {
-        $inner = $this->answer(['@type' => 'releaseOrder', '@outcome' => 'vanished']);
+        $inner = $this->answer(['@type' => 'sampleProcess', '@outcome' => 'vanished']);
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('vanished');
@@ -68,7 +68,7 @@ class ProjectOutcomeTest extends TestCase
 
     public function testMissingOutcomeIsAConfigurationFault(): void
     {
-        $inner = $this->answer(['@type' => 'releaseOrder', 'reason' => 'timeout']);
+        $inner = $this->answer(['@type' => 'sampleProcess', 'reason' => 'timeout']);
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('@outcome');
@@ -87,7 +87,7 @@ class ProjectOutcomeTest extends TestCase
 
     public function testFailureBytesAreTheSameAsBeforeThePackageStep(): void
     {
-        $result = AnswerHarness::result('ReleaseOrder');
+        $result = AnswerHarness::result('SampleProcess');
         $result->setData(['@type' => 'ruleViolation', 'rule' => 'r', 'messageKey' => 'm', 'context' => []]);
         $inner = AnswerHarness::transform()($result, ResponseStatus::RuleViolation);
 
@@ -116,22 +116,22 @@ class ProjectOutcomeTest extends TestCase
 
     public function testAMissingRequiredFieldStaysMissing(): void
     {
-        $inner = $this->answer(['@type' => 'releaseOrder', '@outcome' => 'released', 'orderNumbers' => ['O-1']]);
+        $inner = $this->answer(['@type' => 'sampleProcess', '@outcome' => 'accepted', 'items' => ['I-1']]);
 
         $outer = (new ProjectOutcome())($inner, $this->forms());
 
         $this->assertSame(
-            ['@type' => 'releaseOrder', '@outcome' => 'released', 'orderNumbers' => ['O-1']],
+            ['@type' => 'sampleProcess', '@outcome' => 'accepted', 'items' => ['I-1']],
             $outer->getData()
         );
-        $this->assertArrayNotHasKey('invoiceNumber', $outer->getData());
+        $this->assertArrayNotHasKey('reference', $outer->getData());
     }
 
     public function testStatusErrorsMetadataAndEventsSurvive(): void
     {
         $event = new \stdClass();
-        $result = AnswerHarness::result('ReleaseOrder');
-        $result->setData(['@type' => 'releaseOrder', '@outcome' => 'deferred', 'reason' => 'r']);
+        $result = AnswerHarness::result('SampleProcess');
+        $result->setData(['@type' => 'sampleProcess', '@outcome' => 'deferred', 'reason' => 'r']);
         $result->addEvent($event, EventScope::Domain);
         $inner = AnswerHarness::transform('v2')($result, ResponseStatus::Created);
 
@@ -149,7 +149,7 @@ class ProjectOutcomeTest extends TestCase
     private function forms(): array
     {
         return [
-            'released' => new OutcomeForm(['orderNumbers', 'invoiceNumber']),
+            'accepted' => new OutcomeForm(['items', 'reference']),
             'deferred' => new OutcomeForm(['reason']),
         ];
     }
@@ -159,7 +159,7 @@ class ProjectOutcomeTest extends TestCase
      */
     private function answer(array $data): DomainResponseInterface
     {
-        $result = new ContextResponse('ReleaseOrder');
+        $result = new ContextResponse('SampleProcess');
         $result->setData($data);
 
         return AnswerHarness::transform()($result, ResponseStatus::Success);

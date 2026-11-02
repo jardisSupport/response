@@ -11,7 +11,10 @@ versioning follows [SemVer](https://semver.org/).
 - `Data/Response/OutcomeForm`: readonly value `fields` (list of field names in wire order) and `rowCuts` (field => row keys). The package holds 63 classes (was 61). It carries no wire types - the projection of values to the wire stays the caller's step through `ProjectWire` of the data package.
 
 ### Unchanged
-- `ProjectAnswer` (signature and behaviour) and the wire: `wire-contract.json` is byte-for-byte unchanged. Minor, additive.
+- `ProjectAnswer` (signature and behaviour). Minor, additive.
+
+### Changed
+- Wire contract: 2xx answers carry `@outcome` behind `@type` (`tests/Smoke/Contract/wire-contract.json`, the five 2xx cases; 4xx/5xx bytes unchanged).
 
 ## 4.1.0 — 2026-10-28
 
