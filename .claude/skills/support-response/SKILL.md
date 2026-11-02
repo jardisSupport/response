@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: jardissupport/response 1.0 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
+description: jardissupport/response 4.2 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
 user-invocable: false
 zone: post-active
 persona: C
@@ -9,11 +9,11 @@ next: [support-workflow, generated-code-workflow-api]
 ---
 
 # RESPONSE_COMPONENT_SKILL
-> `jardissupport/response` 2.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
+> `jardissupport/response` 4.2.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, @outcome, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -70,7 +70,20 @@ try {
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
 | 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases, every 2xx case carries `@outcome` behind `@type`: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+
+## Outcome projection (`@outcome`, from 4.2.0)
+
+A process that ends in one of several outcomes marks its 2xx answer with `@outcome` (written by `MarkOutcome` of `workflow`; this package only reads the literal `ProjectOutcome::KEY`). The outer door cuts the answer to the form of the outcome that ran:
+
+```php
+$outer = ($this->handle(ProjectOutcome::class))($inner, [
+    'released' => new OutcomeForm(['orderNumbers', 'invoiceNumber']),
+    'deferred' => new OutcomeForm(['reason']),
+]);
+```
+
+Missing `@outcome` or an outcome without a form is a wiring fault (`ConfigurationException`, the door answers 500 through `MapThrowable`); non-2xx passes unchanged. Additive minor: `ProjectAnswer` is unchanged.
 
 ## Request mapper (array-shaped input, 400 with all faults)
 
@@ -123,6 +136,8 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Response\ProjectRows` | `final`; `__invoke(array $rows, string ...$fields): array` (`list<array<string,mixed>>`) - row cut of a list: each row keeps exactly the named keys in `$fields` order, nothing added, `null` stays; **unlike `ProjectAnswer` a missing key is drift**: `\UnexpectedValueException` with row index and field (also `$rows` no list, row no array) -> `MapThrowable` 500; empty `$fields` -> `\InvalidArgumentException`; knows no field name of its own |
 | `Handler\Response\ReshapeAnswer` | `final`; `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - 2xx: new `DomainResponse` with `$step(data)`, status/errors/metadata/events of every scope carried over; non-2xx = the same instance, step not called; knows no field name; `ProjectAnswer` is built on it |
 | `Handler\Response\ProjectAnswerRows` | `final`; `__construct(ReshapeAnswer = new, ProjectRows = new)`; `__invoke(DomainResponseInterface $response, array $cuts): DomainResponseInterface` - `$cuts` field => row keys; each field cut with `ProjectRows` (missing row key -> `\UnexpectedValueException`); missing or `null` field skipped without error; non-2xx = the same instance |
+| `Handler\Response\ProjectOutcome` | `final`; `public const string KEY = '@outcome'` (same literal as `MarkOutcome::KEY` of `workflow`); `__construct(ReshapeAnswer = new, ProjectAnswerRows = new)`; `__invoke(DomainResponseInterface $response, array $forms): DomainResponseInterface` - `$forms` outcome name => `OutcomeForm`; 2xx keeps `@type`, `@outcome` and exactly the fields of the form that ran (form order, field of another form gone, missing field not added) and cuts list rows by the form's `rowCuts`; non-2xx = the same instance; 2xx without `@outcome` or with an outcome without a form -> `ConfigurationException`; knows no outcome or field name of its own |
+| `Data\Response\OutcomeForm` | `final readonly`; `__construct(array $fields, array $rowCuts = [])`; `fields` list of field names in wire order, `rowCuts` field => row keys; names only, no wire types (the projection of values stays `ProjectWire` of the data package) |
 | `Handler\Door\RequireResource` | `final`; `__invoke(?object $resource, string $name): object` - `null` -> `ConfigurationException('Required resource "<name>" is not provided by the kernel')`, else the same object |
 | `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
 | `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
@@ -180,6 +195,7 @@ Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller
 | 9 | `ReadResult::ofList` with `total` smaller than the items throws `\InvalidArgumentException` | `Data/ReadResult.php` |
 | 10 | A calendar accept closure without its `ValueValidatorInterface` or `AnswerInvalidRequest` without its clock does not construct - there is no default, the package has no runtime dependency on `validation`/`scheduling`; pass them (`new BodyDate(new DateTime())`, `new AnswerInvalidRequest($clock)`) | `Handler/Request/Accept/BodyDate.php`, `Handler/Answer/AnswerInvalidRequest.php` |
 | 11 | The wire contract file is the one shipped test path; changing it is a breaking change of the wire (major version) | `.gitattributes`, `tests/Smoke/WireContractTest.php` |
+| 12 | `ProjectOutcome` fails loudly on a 2xx answer without `@outcome` or with an unknown outcome - it never falls back to a default form | `Handler/Response/ProjectOutcome.php` |
 
 ## Layer rules
 

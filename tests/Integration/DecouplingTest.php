@@ -379,7 +379,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(61, $classes);
+        $this->assertCount(63, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

@@ -13,6 +13,7 @@
                 "status": 200,
                 "data": {
                     "@type": "orderBulkQuote",
+                    "@outcome": "priceBulkQuote",
                     "lineCount": 2,
                     "discountedLines": 1,
                     "city": "Berlin",
@@ -35,7 +36,8 @@
             "envelope": {
                 "status": 200,
                 "data": {
-                    "@type": "voucherRedeemCheck"
+                    "@type": "voucherRedeemCheck",
+                    "@outcome": "checkVoucherRedeemable"
                 },
                 "errors": {},
                 "meta": {
@@ -55,6 +57,7 @@
                 "status": 200,
                 "data": {
                     "@type": "orderQuoteSummary",
+                    "@outcome": "quoteSummary",
                     "currency": "EUR",
                     "lineCount": 3,
                     "total": "42.50"
@@ -77,6 +80,7 @@
                 "status": 200,
                 "data": {
                     "@type": "orderShipment",
+                    "@outcome": "shipped",
                     "orderNo": "A-1001",
                     "state": "Shipped"
                 },
@@ -98,6 +102,7 @@
                 "status": 200,
                 "data": {
                     "@type": "voucherOverview",
+                    "@outcome": "listVouchers",
                     "vouchers": [
                         {
                             "voucherCode": "V-100",

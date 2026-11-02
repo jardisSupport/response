@@ -13,6 +13,7 @@ use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
 use JardisSupport\Response\Handler\Response\BuildResponseData;
+use JardisSupport\Response\Handler\Response\ProjectOutcome;
 use JardisSupport\Response\Handler\Response\TransformResponse;
 use JardisSupport\Response\Tests\Support\EnvelopeCases;
 use JardisSupport\Response\Tests\Support\EnvelopeJson;
@@ -30,7 +31,10 @@ use PHPUnit\Framework\TestCase;
  * the later node wins on the same field), 200-answer-class (merged with a process answer class: the union is
  * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
  * the wire carries it in UTC), 400, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
- * of the process handler. This test drives only the door steps - `ValidateInput`, `MapThrowable`,
+ * of the process handler. Every 2xx answer carries the name of its outcome as `@outcome` right behind `@type`
+ * (the `gives.name` of the end node the builder fixture of the same process ends on; `200-answer-class` has no
+ * builder counterpart, its neutral name `shipped` is the outcome the sub-process step of the case ends on).
+ * This test drives only the door steps - `ValidateInput`, `MapThrowable`,
  * `BuildFailureOutcome`, `BuildResponseData` and `TransformResponse` with a frozen clock - and compares the bytes
  * with the file. The proof that a generated handler reproduces the same file is the consumer test of the
  * builder (E4), not this one. The file ships with the package (the one `tests/` path that is not
@@ -78,13 +82,13 @@ class WireContractTest extends TestCase
         foreach ($expected as [$key, $status]) {
             $this->assertSame($status, $cases[$key]['envelope']['status'], 'case ' . $key);
         }
-        $this->assertSame(['@type' => 'voucherRedeemCheck'], $cases['200-empty']['envelope']['data']);
+        $this->assertSame(['@type' => 'voucherRedeemCheck', '@outcome' => 'checkVoucherRedeemable'], $cases['200-empty']['envelope']['data']);
         $this->assertSame(
-            ['@type' => 'orderQuoteSummary', 'currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50'],
+            ['@type' => 'orderQuoteSummary', '@outcome' => 'quoteSummary', 'currency' => 'EUR', 'lineCount' => 3, 'total' => '42.50'],
             $cases['200-merged']['envelope']['data']
         );
         $this->assertSame(
-            ['@type' => 'orderShipment', 'orderNo' => 'A-1001', 'state' => 'Shipped'],
+            ['@type' => 'orderShipment', '@outcome' => 'shipped', 'orderNo' => 'A-1001', 'state' => 'Shipped'],
             $cases['200-answer-class']['envelope']['data']
         );
         $this->assertSame('2026-01-15T10:45:00+00:00', $cases['200-datetime-offset']['envelope']['data']['vouchers'][0]['createdAt']);
@@ -157,7 +161,7 @@ class WireContractTest extends TestCase
         return $this->answer(
             'OrderBulkQuote',
             ResponseStatus::Success,
-            (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderBulkQuote'),
+            $this->withOutcome((new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderBulkQuote'), 'priceBulkQuote'),
             [],
             'v1'
         );
@@ -168,7 +172,10 @@ class WireContractTest extends TestCase
         return $this->answer(
             'VoucherRedeemCheck',
             ResponseStatus::Success,
-            (new BuildResponseData())(ResponseStatus::Success, new \stdClass(), null, 'VoucherRedeemCheck')
+            $this->withOutcome(
+                (new BuildResponseData())(ResponseStatus::Success, new \stdClass(), null, 'VoucherRedeemCheck'),
+                'checkVoucherRedeemable'
+            )
         );
     }
 
@@ -187,7 +194,7 @@ class WireContractTest extends TestCase
         return $this->answer(
             'OrderQuoteSummary',
             ResponseStatus::Success,
-            (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderQuoteSummary')
+            $this->withOutcome((new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderQuoteSummary'), 'quoteSummary')
         );
     }
 
@@ -210,7 +217,7 @@ class WireContractTest extends TestCase
         return $this->answer(
             'OrderShipment',
             ResponseStatus::Success,
-            (new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderShipment')
+            $this->withOutcome((new BuildResponseData())(ResponseStatus::Success, $response, null, 'OrderShipment'), 'shipped')
         );
     }
 
@@ -238,7 +245,27 @@ class WireContractTest extends TestCase
             ->setTimezone(new DateTimeZone('UTC'))
             ->format(DATE_ATOM);
 
-        return $this->answer('VoucherOverview', ResponseStatus::Success, $data);
+        return $this->answer('VoucherOverview', ResponseStatus::Success, $this->withOutcome($data, 'listVouchers'));
+    }
+
+    /**
+     * The marker of the outcome that ran: `@outcome` joins the data of a 2xx answer right behind `@type`
+     * (the literal of `ProjectOutcome::KEY`).
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function withOutcome(array $data, string $outcome): array
+    {
+        $marked = [];
+        foreach ($data as $name => $value) {
+            $marked[$name] = $value;
+            if ($name === '@type') {
+                $marked[ProjectOutcome::KEY] = $outcome;
+            }
+        }
+
+        return $marked;
     }
 
     private function invalidInput(): DomainResponseInterface
