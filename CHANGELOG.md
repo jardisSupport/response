@@ -4,7 +4,7 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## 4.2.0 — unreleased
+## 4.2.0 — 2026-11-02
 
 ### Added
 - `Handler/Response/ProjectOutcome`: `__invoke(DomainResponseInterface $response, array $forms): DomainResponseInterface` - `$forms` maps an outcome name to its `OutcomeForm`; the 2xx answer keeps `@type`, `@outcome` and exactly the fields of the form that ran, in the order of the form (a field of another form is gone, a missing field is not added), and its list rows are cut by the form's row cuts. Composes `ReshapeAnswer` and `ProjectAnswerRows`, knows no outcome or field name of its own. Every answer that is not 2xx comes back as the very same instance; a 2xx answer without `@outcome` or with an outcome without a form raises `ConfigurationException`. `ProjectOutcome::KEY` is `'@outcome'` - the same literal as `MarkOutcome::KEY` of the `workflow` package.
