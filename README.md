@@ -12,13 +12,14 @@ Status: 1.0.0 in preparation, not released.
 | Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, RequireResource}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
+| Outcome form | `Data/Response/OutcomeForm` (readonly `fields` in wire order, `rowCuts` field => row keys; names only, no wire types), used by `ProjectOutcome` (see below) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-61 classes, every handler `final` with exactly one public entry point (`__invoke`).
+63 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -73,6 +74,15 @@ $rows = ($this->handle(ProjectRows::class))($found->items(), 'orderNumber', 'sta
 $outer = ($this->handle(ProjectAnswerRows::class))($inner, ['orders' => ['orderNumber', 'status']]);
 ```
 
+`ProjectOutcome($response, array $forms)` cuts the 2xx answer of a process to the outcome that ran: the data carries the marker `@outcome` (`ProjectOutcome::KEY`, the same literal as `MarkOutcome::KEY` of `workflow`), `$forms` maps each outcome name to an `OutcomeForm(fields, rowCuts)`. The answer keeps `@type`, `@outcome` and exactly the fields of that form in the form's order (a field of another form is gone, a missing field is not added) and the rows are cut by the form's `rowCuts`. Built on `ReshapeAnswer` and `ProjectAnswerRows`; non-2xx is the same instance; a 2xx answer without `@outcome` or with an unknown outcome raises `ConfigurationException`. The form carries names only - the projection of values to the wire stays the caller's step (`ProjectWire` of the data package).
+
+```php
+$outer = ($this->handle(ProjectOutcome::class))($inner, [
+    'released' => new OutcomeForm(['orderNumbers', 'invoiceNumber']),
+    'deferred' => new OutcomeForm(['reason']),
+]);
+```
+
 `RequireResource($resource, string $name)` is a door step: a resource the kernel does not provide (`null`) raises `ConfigurationException` (`Required resource "<name>" is not provided by the kernel`, the door answers it through `MapThrowable` as 500); otherwise the very same object comes back.
 
 ## Request mapper
@@ -106,7 +116,7 @@ if ($fields !== []) {
 
 ## Failure forms on the wire
 
-The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: the process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) and ships with the package. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
+The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: the process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) and ships with the package. Every 2xx case carries `@outcome` behind `@type`; the bytes of 4xx and 5xx are unchanged. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
 
 **400** `ValidationFailure`
 
