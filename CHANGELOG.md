@@ -4,6 +4,11 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.2.1 — 2026-11-03
+
+### Changed
+- Docs only, `src/` unchanged: the version line and the `BuildResponseData` table of the component skill state that a process 2xx answer carries `@outcome` as its first field (set by `MarkOutcome` of `workflow`) and that a `Reference` answers `@type` + identifier (root + children).
+
 ## 4.2.0 — 2026-11-02
 
 ### Added

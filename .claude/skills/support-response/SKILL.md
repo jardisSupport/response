@@ -9,7 +9,7 @@ next: [support-workflow, generated-code-workflow-api]
 ---
 
 # RESPONSE_COMPONENT_SKILL
-> `jardissupport/response` 4.2.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
+> `jardissupport/response` 4.2.1 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
 
 ## Usage essentials
 
@@ -173,7 +173,7 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 
 | Answer | `data` |
 |---|---|
-| 2xx | `@type` (process name, first letter lower case) + public fields of the response |
+| 2xx | `@type` (process name, lcfirst) + public fields of the response; a process answer carries `@outcome` as its first field (set by `MarkOutcome` of `workflow`); a `Reference` answers `@type` + identifier ⇒ root + children |
 | 400/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
 | other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` |
 | 5xx | `[]` |
