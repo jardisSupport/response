@@ -1,12 +1,16 @@
 ---
 name: support-response
-description: jardissupport/response 4.2 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
+description: "jardissupport/response 4.2 - one shape for the answer of a request-response use case: Response objects, failure forms 400/404/409/422, envelope data, read answers, door steps, request mapper. Use when working with ValidateInput, MapThrowable, AnswerInvalidRequest, BuildResponseData."
 user-invocable: false
 zone: post-active
 persona: C
 prerequisites: [foundation-architecture, support-contracts]
 next: [support-workflow, generated-code-workflow-api]
 ---
+
+## Triggers
+
+jardissupport/response 4.2 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
 
 # RESPONSE_COMPONENT_SKILL
 > `jardissupport/response` 4.2.1 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
