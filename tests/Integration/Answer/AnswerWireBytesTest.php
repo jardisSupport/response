@@ -52,14 +52,20 @@ class AnswerWireBytesTest extends TestCase
         $conflict = new FakeOutcome(ResponseStatus::Conflict, messageKey: 'registry.register_service_clash');
         $rule = new FakeOutcome(
             ResponseStatus::RuleViolation,
+            messageKey: 'sales.voucherNotRedeemable',
+            context: ['rule' => 'VoucherIsRedeemable', 'amount' => '0.00']
+        );
+        $ruleSubject = new FakeOutcome(
+            ResponseStatus::NotFound,
             messageKey: 'sales.voucher.notFound',
-            context: ['identifier' => 'unknown']
+            context: ['voucherCode' => 'unknown']
         );
         $registry = 'RegisterAndReviseServiceOptOutHandler';
 
         $this->assertWire('404', $this->outcome($registry, $notFound, 'RegisterAndReviseServiceOptOut'));
         $this->assertWire('409', $this->outcome($registry, $conflict, 'RegisterAndReviseServiceOptOut'));
         $this->assertWire('422', $this->outcome('VoucherRedeemCheckHandler', $rule, 'VoucherRedeemCheck'));
+        $this->assertWire('404-rule-subject', $this->outcome('VoucherRedeemCheckHandler', $ruleSubject, 'VoucherRedeemCheck'));
     }
 
     public function testAnswerOutcomeReproducesTheSuccessesOfTheWire(): void

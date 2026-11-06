@@ -1,7 +1,7 @@
 {
     "contract": "jardissupport/workflow wire contract: the envelope per status that a generated process handler answers",
     "provenance": {
-        "source": "tests/Smoke/Fixture (copies of the generat, builder commit 165c9c030) run through the real runner",
+        "source": "tests/Smoke/Fixture (copies of the generat, builder commit 6c9fd8648 plus the uncommitted L2-F1/L2-F1b fixes of the working tree) run through the real runner",
         "clock": "frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)",
         "encoding": "EnvelopeJson::FLAGS, empty data/errors/meta as {}"
     },
@@ -217,16 +217,39 @@
         },
         "422": {
             "process": "VoucherRedeemCheck",
-            "scenario": "rule node: the voucher has no root, rule violation",
+            "scenario": "rule node: the voucher exists, the rule rejects it, rule violation",
             "envelope": {
                 "status": 422,
                 "data": {
                     "@type": "ruleViolation",
-                    "rule": "",
-                    "messageKey": "sales.voucher.notFound",
+                    "rule": "VoucherIsRedeemable",
+                    "messageKey": "sales.voucherNotRedeemable",
                     "context": {
-                        "identifier": "unknown"
+                        "amount": "0.00"
                     }
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "VoucherRedeemCheckHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+        },
+        "404-rule-subject": {
+            "process": "VoucherRedeemCheck",
+            "scenario": "rule node: the subject of the rule (the voucher) cannot be loaded, the answer is a 404 and no verdict of the rule",
+            "envelope": {
+                "status": 404,
+                "data": {
+                    "@type": "notFound",
+                    "context": {
+                        "voucherCode": "unknown"
+                    },
+                    "messageKey": "sales.voucher.notFound"
                 },
                 "errors": {},
                 "meta": {
