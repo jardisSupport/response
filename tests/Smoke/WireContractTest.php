@@ -26,11 +26,11 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the ten cases 200, 200-empty (a last node without an answer of
+ * `Contract/wire-contract.json` holds, for the eleven cases 200, 200-empty (a last node without an answer of
  * its own: `data` carries only the `@type`), 200-merged (the answer is the data of all nodes united in run order,
  * the later node wins on the same field), 200-answer-class (merged with a process answer class: the union is
  * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
- * the wire carries it in UTC), 400, 404, 409, 422 and 500, the envelope (status, data, errors, meta)
+ * the wire carries it in UTC), 400, 404, 409, 422, 404-rule-subject (the subject of a rule cannot be loaded: a 404, never a rule verdict) and 500, the envelope (status, data, errors, meta)
  * of the process handler. Every 2xx answer carries the name of its outcome as `@outcome` right behind `@type`
  * (the `gives.name` of the end node the builder fixture of the same process ends on; `200-answer-class` has no
  * builder counterpart, its neutral name `shipped` is the outcome the sub-process step of the case ends on).
@@ -75,6 +75,7 @@ class WireContractTest extends TestCase
             ['404', 404],
             ['409', 409],
             ['422', 422],
+            ['404-rule-subject', 404],
             ['500', 500],
         ];
 
@@ -102,7 +103,7 @@ class WireContractTest extends TestCase
         return [
             'contract' => 'jardissupport/workflow wire contract: the envelope per status that a generated process handler answers',
             'provenance' => [
-                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit 165c9c030) run through the real runner',
+                'source' => 'tests/Smoke/Fixture (copies of the generat, builder commit 6c9fd8648 plus the uncommitted L2-F1/L2-F1b fixes of the working tree) run through the real runner',
                 'clock' => 'frozen at 2026-01-15T10:30:00+00:00 (meta.duration 0.0)',
                 'encoding' => 'EnvelopeJson::FLAGS, empty data/errors/meta as {}',
             ],
@@ -115,7 +116,8 @@ class WireContractTest extends TestCase
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
                 '404' => $this->case('RegisterAndReviseServiceOptOut', 'second call node: the callee answers 404, declared key', $this->revisionTargetMissing()),
                 '409' => $this->case('RegisterAndReviseServiceOptOut', 'first call node: the callee answers 409, declared key', $this->registrationClash()),
-                '422' => $this->case('VoucherRedeemCheck', 'rule node: the voucher has no root, rule violation', $this->ruleViolation()),
+                '422' => $this->case('VoucherRedeemCheck', 'rule node: the voucher exists, the rule rejects it, rule violation', $this->ruleViolation()),
+                '404-rule-subject' => $this->case('VoucherRedeemCheck', 'rule node: the subject of the rule (the voucher) cannot be loaded, the answer is a 404 and no verdict of the rule', $this->ruleSubjectMissing()),
                 '500' => $this->case('RegisterAndReviseServiceOptOut', 'first call node: the callee throws, empty data', $this->calleeDown()),
             ],
         ];
@@ -288,7 +290,17 @@ class WireContractTest extends TestCase
 
     private function ruleViolation(): DomainResponseInterface
     {
-        return $this->reject('VoucherRedeemCheck', ResponseStatus::RuleViolation, 'sales.voucher.notFound', ['identifier' => 'unknown']);
+        return $this->reject(
+            'VoucherRedeemCheck',
+            ResponseStatus::RuleViolation,
+            'sales.voucherNotRedeemable',
+            ['rule' => 'VoucherIsRedeemable', 'amount' => '0.00']
+        );
+    }
+
+    private function ruleSubjectMissing(): DomainResponseInterface
+    {
+        return $this->reject('VoucherRedeemCheck', ResponseStatus::NotFound, 'sales.voucher.notFound', ['voucherCode' => 'unknown']);
     }
 
     private function registrationClash(): DomainResponseInterface
