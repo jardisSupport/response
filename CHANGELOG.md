@@ -4,6 +4,11 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.2.3 — 2026-11-06
+
+### Changed
+- Wire contract (`tests/Smoke/Contract/wire-contract.json`), class A of the builder (a rule node whose subject cannot be loaded): case `422` is now a real rule verdict (`rule` `VoucherIsRedeemable`, message key `sales.voucherNotRedeemable`, context `amount`); new case `404-rule-subject` - the subject of the rule is unknown, the answer is a declared `404` (`@type` `notFound`, context `voucherCode`, message key `sales.voucher.notFound`), never a verdict of the rule. The other nine cases are byte-identical. `src/` unchanged: the failure forms already answer both shapes; only the proof files (`WireContractTest`, `AnswerWireBytesTest`) carry the two cases. Released as a patch by decision of Rolf 2026-11-06 (the change fixes what a generated handler answers for an unknown rule subject, it adds no behaviour to the package).
+
 ## 4.2.1 — 2026-11-03
 
 ### Changed
