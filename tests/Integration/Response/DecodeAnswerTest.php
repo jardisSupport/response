@@ -316,21 +316,110 @@ class DecodeAnswerTest extends TestCase
         (new DecodeAnswer())('{"status":400,"data":{},"errors":{"0":"x"},"meta":{}}', 400);
     }
 
+    /**
+     * One shape rule at every depth: a non-empty object whose keys are `0`, `1`, ... without a gap would be written as a
+     * JSON list, so it is no answer - on top of `data`/`meta` and nested, in objects and in lists.
+     */
     #[DataProvider('partsWithTheKeysOfAList')]
-    public function testAPartWithTheKeysOfAListIsNoJardisAnswer(string $body): void
+    public function testAnObjectWithTheKeysOfAListIsNoJardisAnswerAtEveryDepth(string $body, int $status): void
     {
         $this->expectException(NoJardisAnswerException::class);
 
-        (new DecodeAnswer())($body, 200);
+        (new DecodeAnswer())($body, $status);
     }
 
     /**
-     * @return iterable<string, array{string}>
+     * @return iterable<string, array{string, int}>
      */
     public static function partsWithTheKeysOfAList(): iterable
     {
-        yield 'data' => ['{"status":200,"data":{"0":"a","1":"b"},"errors":{},"meta":{}}'];
-        yield 'meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a"}}'];
+        yield 'data' => ['{"status":200,"data":{"0":"a","1":"b"},"errors":{},"meta":{}}', 200];
+        yield 'meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a"}}', 200];
+        yield 'nested in data' => ['{"status":200,"data":{"x":{"0":"a","1":"b"}},"errors":{},"meta":{}}', 200];
+        yield 'nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"x":{"0":"a","1":"b"}}}', 200];
+        yield 'one key nested in data' => ['{"status":200,"data":{"x":{"0":"a"}},"errors":{},"meta":{}}', 200];
+        yield 'in a list of data' => ['{"status":200,"data":{"x":[{"0":"a","1":"b"}]},"errors":{},"meta":{}}', 200];
+        yield 'in a list of a list in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"x":[[{"0":"a"}]]}}', 200];
+        yield 'nested in data of a failure' => ['{"status":404,"data":{"x":{"0":"a","1":"b"}},"errors":{},"meta":{}}', 404];
+        yield 'deep in data' => ['{"status":200,"data":{"a":{"b":{"c":[{"d":{"0":1,"1":2,"2":3}}]}}},"errors":{},"meta":{}}', 200];
+        yield 'nested object in a list-like object' => ['{"status":200,"data":{"x":{"0":{"y":1},"1":{"0":"z"}}},"errors":{},"meta":{}}', 200];
+    }
+
+    /**
+     * The counter-proof of the rule: what stays an object (name beside the numbers, gap, other order, an empty object)
+     * and what stays a list (a real list, an empty list) is an answer and is written back with the same form, at the top
+     * and nested, byte for byte.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function shapesThatSurviveTheRoundTrip(): iterable
+    {
+        yield 'real list in data' => ['{"status":200,"data":{"x":["a","b"]},"errors":{},"meta":{}}'];
+        yield 'real list of objects in data' => ['{"status":200,"data":{"x":[{"a":1},{"b":2}]},"errors":{},"meta":{}}'];
+        yield 'empty list nested in data' => ['{"status":200,"data":{"x":[]},"errors":{},"meta":{}}'];
+        yield 'empty object nested in data' => ['{"status":200,"data":{"x":{}},"errors":{},"meta":{}}'];
+        yield 'empty list and empty object nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"l":[],"o":{}}}'];
+        yield 'empty object and list in a list' => ['{"status":200,"data":{"x":[{},[]]},"errors":{},"meta":{}}'];
+        yield 'numeric keys with a gap nested' => ['{"status":200,"data":{"x":{"1":"a","3":"b"}},"errors":{},"meta":{}}'];
+        yield 'numeric key with a name nested' => ['{"status":200,"data":{"x":{"0":"a","y":"b"}},"errors":{},"meta":{}}'];
+        yield 'numeric keys in another order nested' => ['{"status":200,"data":{"x":{"1":"a","0":"b"}},"errors":{},"meta":{}}'];
+        yield 'numeric keys not starting at zero nested in a list' => ['{"status":200,"data":{"x":[{"1":"a"}]},"errors":{},"meta":{}}'];
+        yield 'numeric keys at the top of meta with a gap' => ['{"status":200,"data":{},"errors":{},"meta":{"2":"a","5":"b"}}'];
+        yield 'key with a NUL byte inside' => ['{"status":200,"data":{"a\u0000b":1,"c\u0000":{"d\u0000e":2}},"errors":{},"meta":{}}'];
+    }
+
+    #[DataProvider('shapesThatSurviveTheRoundTrip')]
+    public function testShapesThatAreNotAListStayWhatTheyWereAtEveryDepth(string $body): void
+    {
+        $response = (new DecodeAnswer())($body, 200);
+
+        $this->assertSame($body, json_encode(EnvelopeJson::envelope($response)));
+    }
+
+    public function testAnEmptyObjectStaysAnObjectAndAnEmptyListStaysAListWhileTheTopOfAPartMustBeAnObject(): void
+    {
+        $nested = (new DecodeAnswer())('{"status":200,"data":{"o":{},"l":[]},"errors":{},"meta":{}}', 200)->getData();
+
+        $this->assertInstanceOf(stdClass::class, $nested['o']);
+        $this->assertSame([], $nested['l']);
+
+        $top = (new DecodeAnswer())('{"status":200,"data":{},"errors":{},"meta":{}}', 200);
+        $this->assertSame([], $top->getData());
+        $this->assertSame('{"status":200,"data":{},"errors":{},"meta":{}}', json_encode(EnvelopeJson::envelope($top)));
+
+        $this->expectException(NoJardisAnswerException::class);
+        (new DecodeAnswer())('{"status":200,"data":[],"errors":{},"meta":{}}', 200);
+    }
+
+    /**
+     * A key that starts with a NUL byte is refused by PHP when it decodes into an object (mangled property names); it is
+     * no answer at any depth - the envelope, `data`, `meta`, `errors`, nested and in lists.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function keysWithALeadingNulByte(): iterable
+    {
+        yield 'envelope' => ['{"status":200,"data":{},"errors":{},"meta":{},"\u0000x":1}', 200];
+        yield 'data' => ['{"status":200,"data":{"\u0000x":1},"errors":{},"meta":{}}', 200];
+        yield 'meta' => ['{"status":200,"data":{},"errors":{},"meta":{"\u0000x":1}}', 200];
+        yield 'errors' => ['{"status":400,"data":{},"errors":{"\u0000x":["a"]},"meta":{}}', 400];
+        yield 'nested in data' => ['{"status":200,"data":{"a":{"\u0000x":1}},"errors":{},"meta":{}}', 200];
+        yield 'nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"a":{"b":{"\u0000x":1}}}}', 200];
+        yield 'in a list of data' => ['{"status":200,"data":{"a":[{"\u0000x":1}]},"errors":{},"meta":{}}', 200];
+        yield 'nested in errors' => ['{"status":400,"data":{},"errors":{"a":[{"\u0000x":1}]},"meta":{}}', 400];
+        yield 'only the NUL byte' => ['{"status":200,"data":{"\u0000":1},"errors":{},"meta":{}}', 200];
+    }
+
+    #[DataProvider('keysWithALeadingNulByte')]
+    public function testAKeyWithALeadingNulByteIsNoJardisAnswerAtEveryDepth(string $body, int $status): void
+    {
+        try {
+            (new DecodeAnswer())($body, $status);
+            $this->fail('A key with a leading NUL byte must be refused.');
+        } catch (NoJardisAnswerException $refused) {
+            $this->assertStringContainsString('NUL byte', $refused->getMessage());
+            $this->assertInstanceOf(\JsonException::class, $refused->getPrevious());
+        }
     }
 
     public function testNumericKeysThatAreNotAListStayAnswers(): void
@@ -376,8 +465,15 @@ class DecodeAnswerTest extends TestCase
         }
         yield 'rejected errors numeric key' => ['{"status":400,"data":{},"errors":{"0":"x"},"meta":{}}', 400];
         yield 'numeric keys in data' => ['{"status":200,"data":{"0":"a","1":"b","x":{"5":1,"7":2}},"errors":{},"meta":{}}', 200];
-        yield 'list-like object in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a"}}', 200];
-        yield 'list-like object in data' => ['{"status":200,"data":{"0":"a","1":"b"},"errors":{},"meta":{}}', 200];
+        foreach (self::partsWithTheKeysOfAList() as $name => $case) {
+            yield 'rejected list-like ' . $name => $case;
+        }
+        foreach (self::keysWithALeadingNulByte() as $name => $case) {
+            yield 'rejected NUL key ' . $name => $case;
+        }
+        foreach (self::shapesThatSurviveTheRoundTrip() as $name => [$body]) {
+            yield 'shape ' . $name => [$body, 200];
+        }
         yield 'numeric key with a name in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a","x":1}}', 200];
         yield 'numeric keys with a gap in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"1":"a","3":"b"}}', 200];
         yield 'empty and odd keys' => ['{"status":200,"data":{"":1," ":2,"a.b":3,"\u00e4":4},"errors":{"":["x"]},"meta":{}}', 200];
