@@ -7,6 +7,7 @@ namespace JardisSupport\Response\Tests\Integration\Response;
 use JardisSupport\Contract\Kernel\EventScope;
 use JardisSupport\Response\Exception\NoJardisAnswerException;
 use JardisSupport\Response\Handler\Response\DecodeAnswer;
+use JardisSupport\Response\Handler\Response\RequireLosslessBody;
 use JardisSupport\Response\Tests\Support\EnvelopeJson;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -477,6 +478,12 @@ class DecodeAnswerTest extends TestCase
         foreach (self::objectsWithAKeyTwice() as $name => $case) {
             yield 'rejected key twice ' . $name => $case;
         }
+        foreach (self::numbersThatUnderflowToZero() as $name => $case) {
+            yield 'rejected underflow ' . $name => $case;
+        }
+        foreach (self::numbersThatDoNotUnderflow() as $name => [$number]) {
+            yield 'number ' . $name => ['{"status":200,"data":{"n":' . $number . '},"errors":{},"meta":{}}', 200];
+        }
         foreach (self::keysThatAreNotTwice() as $name => [$body]) {
             yield 'key ' . $name => [$body, 200];
         }
@@ -676,6 +683,182 @@ class DecodeAnswerTest extends TestCase
 
         $this->assertSame(200, $response->getStatus());
         $this->assertSame($body, json_encode(EnvelopeJson::envelope($response), JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * A number with a non-zero mantissa that underflows to `0.0` is read as zero: another value, lost without a trace.
+     * At any depth of the envelope, `data`, `meta` and `errors`, in objects and lists, positive and negative.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function numbersThatUnderflowToZero(): iterable
+    {
+        yield 'in data' => ['{"status":200,"data":{"n":1e-400},"errors":{},"meta":{}}', 200];
+        yield 'negative in data' => ['{"status":200,"data":{"n":-1e-400},"errors":{},"meta":{}}', 200];
+        yield 'capital E and sign' => ['{"status":200,"data":{"n":1E-400},"errors":{},"meta":{}}', 200];
+        yield 'with a fraction' => ['{"status":200,"data":{"n":0.1e-999},"errors":{},"meta":{}}', 200];
+        yield 'long mantissa' => ['{"status":200,"data":{"n":123456.789e-999},"errors":{},"meta":{}}', 200];
+        yield 'half of the smallest float' => ['{"status":200,"data":{"n":2.4e-324},"errors":{},"meta":{}}', 200];
+        yield 'huge exponent' => ['{"status":200,"data":{"n":1e-99999999999999999999},"errors":{},"meta":{}}', 200];
+        yield 'in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"n":1e-400}}', 200];
+        yield 'nested in data' => ['{"status":200,"data":{"a":{"b":[1,{"c":1e-400}]}},"errors":{},"meta":{}}', 200];
+        yield 'nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"a":{"b":-1e-400}}}', 200];
+        yield 'in a list of a list' => ['{"status":200,"data":{"x":[[1e-400]]},"errors":{},"meta":{}}', 200];
+        yield 'in data of a failure' => ['{"status":404,"data":{"n":1e-400},"errors":{},"meta":{}}', 404];
+        yield 'in errors' => ['{"status":403,"data":{},"errors":{"n":[1e-400]},"meta":{}}', 403];
+        yield 'nested in errors' => ['{"status":403,"data":{},"errors":{"n":{"a":1e-400}},"meta":{}}', 403];
+        yield 'in a key beside the four' => ['{"status":200,"data":{},"errors":{},"meta":{},"x":1e-400}', 200];
+        yield 'pretty printed' => ["{\n  \"status\": 200,\n  \"data\": {\n    \"n\": 1e-400\n  },\n  \"errors\": {},\n  \"meta\": {}\n}", 200];
+    }
+
+    #[DataProvider('numbersThatUnderflowToZero')]
+    public function testANumberThatUnderflowsToZeroIsNoJardisAnswerAtEveryDepth(string $body, int $status): void
+    {
+        try {
+            (new DecodeAnswer())($body, $status);
+            $this->fail('A number that underflows to zero must be refused.');
+        } catch (NoJardisAnswerException $refused) {
+            $this->assertStringContainsString('underflows to zero', $refused->getMessage());
+        }
+    }
+
+    /**
+     * The counter-proof: the border is the zero. A zero in any spelling, the smallest floats and numbers that are
+     * rounded in their last digits keep their value; text that looks like such a number inside a string is a string.
+     *
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function numbersThatDoNotUnderflow(): iterable
+    {
+        yield 'zero' => ['0', 0];
+        yield 'zero with a fraction' => ['0.0', 0.0];
+        yield 'negative zero' => ['-0.0', -0.0];
+        yield 'negative integer zero' => ['-0', 0];
+        yield 'zero with an exponent' => ['0e-400', 0.0];
+        yield 'zero mantissa with a fraction and an exponent' => ['0.000E-999', 0.0];
+        yield 'negative zero with an exponent' => ['-0.0e-999', -0.0];
+        yield 'small' => ['1e-300', 1e-300];
+        yield 'smallest float' => ['5e-324', 5e-324];
+        yield 'rounds to the smallest float' => ['3e-324', 5e-324];
+        yield 'smallest normal float' => ['2.2250738585072014e-308', 2.2250738585072014e-308];
+        yield 'rounded in the last digits' => ['0.1000000000000000055511151231257827', 0.1];
+        yield 'many digits' => ['3.14159265358979323846264338327950288', 3.14159265358979323846264338327950288];
+        yield 'long zero fraction' => ['0.00000000000000000000000000000000000000000000000000000001', 1e-56];
+    }
+
+    #[DataProvider('numbersThatDoNotUnderflow')]
+    public function testZeroAndRoundedNumbersAreAnswersAtTheTopAndNested(string $number, mixed $value): void
+    {
+        $bytes = '{"status":200,"data":{"n":' . $number . ',"a":{"l":[' . $number . ',{"m":' . $number . '}]}},'
+            . '"errors":{},"meta":{"n":' . $number . '}}';
+
+        $response = (new DecodeAnswer())($bytes, 200);
+
+        $data = $response->getData();
+        $this->assertSame($value, $data['n']);
+        $this->assertSame([$value, ['m' => $value]], $data['a']['l'] ?? null);
+        $this->assertSame($value, $response->getMetadata()['n']);
+        $this->assertNotSame('', json_encode(EnvelopeJson::envelope($response), JSON_PRESERVE_ZERO_FRACTION));
+    }
+
+    public function testAnUnderflowTextInsideAStringIsAString(): void
+    {
+        $response = (new DecodeAnswer())(
+            '{"status":200,"data":{"x":"1e-400","1e-400":"y"},"errors":{},"meta":{}}',
+            200
+        );
+
+        $this->assertSame(['x' => '1e-400', '1e-400' => 'y'], $response->getData());
+    }
+
+    /**
+     * A million escapes (two megabytes) before the loss: a regular expression runs into its match, JIT-stack or
+     * backtrack limit there and gives up (the former scanner accepted the body from about 1.0 to 1.5 million escapes on) - the check must never read that as "accepted". Every loss behind the
+     * escapes is found, in a value, in a key, nested and after a second string.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function lossesBehindAMillionEscapes(): iterable
+    {
+        $escapes = str_repeat('\n', 1000000);
+        $text = '"' . $escapes . '"';
+        yield 'integer beyond int64' => ['{"status":200,"data":{"s":' . $text . ',"n":99999999999999999999},"errors":{},"meta":{}}', 'beyond 64 bits'];
+        yield 'integer beyond int64 in a key beside' => ['{"status":200,"data":{"s":' . $text . '},"errors":{},"meta":{},"n":-9223372036854775809}', 'beyond 64 bits'];
+        yield 'nested integer' => ['{"status":200,"data":{"a":[{"s":' . $text . '},{"b":{"n":99999999999999999999}}]},"errors":{},"meta":{}}', 'beyond 64 bits'];
+        yield 'key twice' => ['{"status":200,"data":{"s":' . $text . ',"a":1,"a":2},"errors":{},"meta":{}}', 'key twice'];
+        yield 'key twice nested' => ['{"status":200,"data":{"x":{"s":' . $text . ',"y":[{"a":1,"a":2}]}},"errors":{},"meta":{}}', 'key twice'];
+        yield 'key that is the big text twice' => ['{"status":200,"data":{' . $text . ':1,' . $text . ':2},"errors":{},"meta":{}}', 'key twice'];
+        yield 'underflow' => ['{"status":200,"data":{"s":' . $text . ',"n":1e-400},"errors":{},"meta":{}}', 'underflows to zero'];
+        yield 'underflow in meta' => ['{"status":200,"data":{"s":' . $text . '},"errors":{},"meta":{"x":{"n":-1e-400}}}', 'underflows to zero'];
+        yield 'two big strings' => ['{"status":200,"data":{"s":' . $text . ',"t":' . $text . ',"n":99999999999999999999},"errors":{},"meta":{}}', 'beyond 64 bits'];
+    }
+
+    #[DataProvider('lossesBehindAMillionEscapes')]
+    public function testALossBehindAMillionEscapesIsStillFound(string $body, string $reason): void
+    {
+        $this->assertGreaterThan(2_000_000, strlen($body));
+
+        try {
+            (new DecodeAnswer())($body, 200);
+            $this->fail('The loss behind the escapes must be refused.');
+        } catch (NoJardisAnswerException $refused) {
+            $this->assertStringContainsString($reason, $refused->getMessage());
+        }
+    }
+
+    /**
+     * The counter-proof: a legitimate large answer - two megabytes of escapes, of members, of numbers - has no
+     * loss and is an answer, not a refusal for its size; the check has no limit of its own.
+     */
+    public function testALargeAnswerWithoutALossIsAnAnswer(): void
+    {
+        $escapes = str_repeat('\n', 1000000);
+        $numbers = implode(',', array_map(static fn (int $i): string => (string) ($i * 7919), range(1, 150000)));
+        $members = implode(',', array_map(static fn (int $i): string => '"key' . $i . '":' . $i . '.5', range(1, 60000)));
+        $bytes = '{"status":200,"data":{"s":"' . $escapes . '","l":[' . $numbers . '],"m":{' . $members . '},'
+            . '"max":9223372036854775807,"tiny":5e-324,"zero":0.0,"a":{"s":"' . $escapes . '","n":-0.0}},'
+            . '"errors":{},"meta":{"t":"' . $escapes . '"}}';
+        $this->assertGreaterThan(3_000_000, strlen($bytes));
+
+        $response = (new DecodeAnswer())($bytes, 200);
+
+        $data = $response->getData();
+        $this->assertSame(str_repeat("\n", 1000000), $data['s']);
+        $this->assertCount(150000, $data['l']);
+        $this->assertCount(60000, $data['m']);
+        $this->assertSame(PHP_INT_MAX, $data['max']);
+        $this->assertSame(5e-324, $data['tiny']);
+        $this->assertSame(str_repeat("\n", 1000000), $response->getMetadata()['t']);
+    }
+
+    /**
+     * The closure never reads a check that did not run to the end as "accepted": a body it cannot walk to its end
+     * (a string or a container left open - no valid JSON; `DecodeAnswer` has refused it before) is refused.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function bodiesTheScanCannotFinish(): iterable
+    {
+        yield 'string left open' => ['{"a":"x'];
+        yield 'string left open after an escape' => ['{"a":"x\\'];
+        yield 'object left open' => ['{"a":1'];
+        yield 'list left open' => ['{"a":[1,[2]}'];
+    }
+
+    #[DataProvider('bodiesTheScanCannotFinish')]
+    public function testABodyTheScanCannotFinishIsRefused(string $body): void
+    {
+        $this->expectException(NoJardisAnswerException::class);
+        $this->expectExceptionMessage('could not reach its end');
+
+        (new RequireLosslessBody())($body);
+    }
+
+    public function testTheScanAcceptsWhatItHasWalkedToTheEnd(): void
+    {
+        (new RequireLosslessBody())(" {\"a\" : [ 1 , \"x\\\\\" , {\"b\":null,\"c\":true} ] , \"d\":-0.5e-3 }\n");
+
+        $this->addToAssertionCount(1);
     }
 
     public function testNestingThatTheDecoderRefusesIsNoJardisAnswer(): void
