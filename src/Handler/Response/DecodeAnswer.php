@@ -33,6 +33,11 @@ use stdClass;
  * - A number without a JSON form (`1e999` reads as infinity, as does `-1e999`) is no value a domain writes: at any
  *   depth of `data`, `meta` and `errors` it is {@see NoJardisAnswerException}, because writing it back would fail
  *   with a foreign exception. What comes back without that exception can be written into the envelope again.
+ * - What the decoder loses without a trace is no answer ({@see RequireLosslessBody}, anywhere in the body): an integer
+ *   beyond 64 bits (`99999999999999999999`, `-9223372036854775809`) would become a float - another value and another
+ *   type - and a key twice in one object (`{"a":1,"a":2}`) would keep only the last value. `PHP_INT_MAX`,
+ *   `PHP_INT_MIN`, a number with a fraction or exponent (`1.5`, `1e3`, `1.0`, `1e19`; a float in the text stays a
+ *   float) and `"a"`/`"A"` as two keys stay answers; a number or a key inside a string value is never looked at.
  * - `errors` comes back in the contract type, a list of texts per key: a text becomes a list with one entry,
  *   a list keeps its entries, any other value (number, object) becomes one entry holding its JSON text. A key
  *   of `errors` is the name of a context, a text: a numeric key (`{"0": ...}`) is not the contract type and is
@@ -40,7 +45,8 @@ use stdClass;
  *   there; those bytes are therefore not written back identically.
  * - Events are not part of the envelope: the response carries none.
  *
- * The closure knows no field name and no status rule of its own.
+ * The closure knows no field name and no status rule of its own: it decodes, lets {@see RequireLosslessBody} refuse the
+ * losses and builds the response from the parts.
  *
  * Atomic closure - one entry point.
  */
@@ -50,6 +56,11 @@ final class DecodeAnswer
 
     private const TEXT_FLAGS = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         | JSON_PRESERVE_ZERO_FRACTION;
+
+    public function __construct(
+        private readonly RequireLosslessBody $requireLosslessBody = new RequireLosslessBody(),
+    ) {
+    }
 
     /**
      * @throws NoJardisAnswerException when body and status are not the answer of a Jardis domain
@@ -100,6 +111,7 @@ final class DecodeAnswer
         if (!$value instanceof stdClass) {
             throw new NoJardisAnswerException('The body is not a JSON object.');
         }
+        ($this->requireLosslessBody)($body);
         foreach (self::KEYS as $key) {
             if (!property_exists($value, $key)) {
                 throw new NoJardisAnswerException(sprintf('The envelope lacks the key "%s".', $key));

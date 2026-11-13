@@ -471,6 +471,15 @@ class DecodeAnswerTest extends TestCase
         foreach (self::keysWithALeadingNulByte() as $name => $case) {
             yield 'rejected NUL key ' . $name => $case;
         }
+        foreach (self::integersBeyondInt64() as $name => $case) {
+            yield 'rejected integer ' . $name => $case;
+        }
+        foreach (self::objectsWithAKeyTwice() as $name => $case) {
+            yield 'rejected key twice ' . $name => $case;
+        }
+        foreach (self::keysThatAreNotTwice() as $name => [$body]) {
+            yield 'key ' . $name => [$body, 200];
+        }
         foreach (self::shapesThatSurviveTheRoundTrip() as $name => [$body]) {
             yield 'shape ' . $name => [$body, 200];
         }
@@ -478,7 +487,7 @@ class DecodeAnswerTest extends TestCase
         yield 'numeric keys with a gap in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"1":"a","3":"b"}}', 200];
         yield 'empty and odd keys' => ['{"status":200,"data":{"":1," ":2,"a.b":3,"\u00e4":4},"errors":{"":["x"]},"meta":{}}', 200];
         yield 'texts' => ['{"status":200,"data":{"t":"\u00e4\ud83d\ude00\/\u0000\n"},"errors":{},"meta":{}}', 200];
-        yield 'numbers' => ['{"status":200,"data":{"a":-0,"b":-0.0,"c":0.1e1,"d":1E2,"e":123456789012345678901234567890},"errors":{},"meta":{}}', 200];
+        yield 'numbers' => ['{"status":200,"data":{"a":-0,"b":-0.0,"c":0.1e1,"d":1E2,"e":1.2345678901234568e29},"errors":{},"meta":{}}', 200];
         yield 'errors without a text form but finite' => ['{"status":500,"data":{},"errors":{"a":[true,null,1.5,{"k":[]}]},"meta":{}}', 500];
         yield 'errors with an empty list' => ['{"status":400,"data":{},"errors":{"a":[]},"meta":{}}', 400];
         yield 'nesting at the limit of data' => [self::nested(509), 200];
@@ -513,6 +522,160 @@ class DecodeAnswerTest extends TestCase
         // and the written bytes are an answer again
         $again = (new DecodeAnswer())($compact, $status);
         $this->assertSame($status, $again->getStatus());
+    }
+
+    /**
+     * An integer beyond 64 bits would be read as a float by the decoder: another value (rounded) and another type, so
+     * it is no answer - at any depth of the envelope, `data`, `meta` and `errors`, in objects and in lists, positive
+     * and negative, in a failure answer as well.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function integersBeyondInt64(): iterable
+    {
+        $big = '99999999999999999999';
+        yield 'positive in data' => ['{"status":200,"data":{"n":' . $big . '},"errors":{},"meta":{}}', 200];
+        yield 'negative in data' => ['{"status":200,"data":{"n":-9223372036854775809},"errors":{},"meta":{}}', 200];
+        yield 'PHP_INT_MAX plus one' => ['{"status":200,"data":{"n":9223372036854775808},"errors":{},"meta":{}}', 200];
+        yield 'twenty digits with a leading minus' => ['{"status":200,"data":{"n":-' . $big . '},"errors":{},"meta":{}}', 200];
+        yield 'thirty digits' => ['{"status":200,"data":{"n":123456789012345678901234567890},"errors":{},"meta":{}}', 200];
+        yield 'in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"n":' . $big . '}}', 200];
+        yield 'nested in data' => ['{"status":200,"data":{"a":{"b":[1,{"c":' . $big . '}]}},"errors":{},"meta":{}}', 200];
+        yield 'nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"a":{"b":-' . $big . '}}}', 200];
+        yield 'in a list of a list in data' => ['{"status":200,"data":{"x":[[' . $big . ']]},"errors":{},"meta":{}}', 200];
+        yield 'in data of a failure' => ['{"status":404,"data":{"n":' . $big . '},"errors":{},"meta":{}}', 404];
+        yield 'in errors' => ['{"status":403,"data":{},"errors":{"n":[' . $big . ']},"meta":{}}', 403];
+        yield 'nested in errors' => ['{"status":403,"data":{},"errors":{"n":{"a":' . $big . '}},"meta":{}}', 403];
+        yield 'in a key beside the four' => ['{"status":200,"data":{},"errors":{},"meta":{},"x":' . $big . '}', 200];
+        yield 'after a string with an escaped quote' => ['{"status":200,"data":{"s":"a\"b\\\\","n":' . $big . '},"errors":{},"meta":{}}', 200];
+        yield 'pretty printed' => ["{\n  \"status\": 200,\n  \"data\": {\n    \"n\": " . $big . "\n  },\n  \"errors\": {},\n  \"meta\": {}\n}", 200];
+        yield 'last token of a list' => ['{"status":200,"data":{"x":[1,' . $big . ']},"errors":{},"meta":{}}', 200];
+    }
+
+    #[DataProvider('integersBeyondInt64')]
+    public function testAnIntegerBeyondInt64IsNoJardisAnswerAtEveryDepth(string $body, int $status): void
+    {
+        try {
+            (new DecodeAnswer())($body, $status);
+            $this->fail('An integer beyond 64 bits must be refused.');
+        } catch (NoJardisAnswerException $refused) {
+            $this->assertStringContainsString('beyond 64 bits', $refused->getMessage());
+        }
+    }
+
+    /**
+     * The counter-proof: the numbers at the edge and the numbers that are floats in the text keep value and type, and
+     * what looks like a number inside a string is a string.
+     */
+    public function testNumbersAtTheEdgeOfInt64AndFloatsInTheTextKeepValueAndType(): void
+    {
+        $bytes = '{"status":200,"data":{"max":9223372036854775807,"min":-9223372036854775808,"zero":0,"one":1.0,'
+            . '"half":1.5,"thousand":1000.0,"over":1.0e+19,"nested":{"l":[9223372036854775807,-9223372036854775808,2.5]},'
+            . '"text":"99999999999999999999","key99999999999999999999":"-9223372036854775809"},'
+            . '"errors":{},"meta":{"max":9223372036854775807,"min":-9223372036854775808}}';
+
+        $response = (new DecodeAnswer())($bytes, 200);
+
+        $data = $response->getData();
+        $this->assertSame(PHP_INT_MAX, $data['max']);
+        $this->assertSame(PHP_INT_MIN, $data['min']);
+        $this->assertSame(0, $data['zero']);
+        $this->assertSame(1.0, $data['one']);
+        $this->assertSame(1.5, $data['half']);
+        $this->assertSame(1000.0, $data['thousand']);
+        $this->assertSame(1.0e19, $data['over']);
+        $this->assertSame([PHP_INT_MAX, PHP_INT_MIN, 2.5], $data['nested']['l']);
+        $this->assertSame('99999999999999999999', $data['text']);
+        $this->assertSame('-9223372036854775809', $data['key99999999999999999999']);
+        $this->assertSame(PHP_INT_MIN, $response->getMetadata()['min']);
+        $this->assertSame($bytes, json_encode(EnvelopeJson::envelope($response), JSON_PRESERVE_ZERO_FRACTION));
+    }
+
+    public function testTheTextFormOfAFloatInTheBodyDoesNotMatter(): void
+    {
+        $response = (new DecodeAnswer())(
+            '{"status":200,"data":{"a":1e3,"b":1E19,"c":0.1e1,"d":-0.0,"e":1.2345678901234568e29,"f":1.0},"errors":{},"meta":{}}',
+            200
+        );
+
+        $this->assertSame([1000.0, 1.0e19, 1.0, -0.0, 1.2345678901234568e29, 1.0], array_values($response->getData()));
+    }
+
+    /**
+     * A key that occurs twice in one object keeps only its last value in the decoder - data lost without a trace - so it
+     * is no answer: on top and nested, in `data`, `meta`, `errors`, the envelope and in lists, with the same value or
+     * another, written the same way or with an escape.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function objectsWithAKeyTwice(): iterable
+    {
+        yield 'in data' => ['{"status":200,"data":{"a":1,"a":2},"errors":{},"meta":{}}', 200];
+        yield 'in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"a":1,"a":2}}', 200];
+        yield 'in errors' => ['{"status":400,"data":{},"errors":{"a":["x"],"a":["y"]},"meta":{}}', 400];
+        yield 'in the envelope' => ['{"status":200,"status":200,"data":{},"errors":{},"meta":{}}', 200];
+        yield 'a part twice' => ['{"status":200,"data":{"a":1},"errors":{},"meta":{},"data":{"a":2}}', 200];
+        yield 'beside the four' => ['{"status":200,"data":{},"errors":{},"meta":{},"x":1,"x":2}', 200];
+        yield 'nested in data' => ['{"status":200,"data":{"x":{"a":1,"a":2}},"errors":{},"meta":{}}', 200];
+        yield 'nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"x":{"y":{"a":1,"a":2}}}}', 200];
+        yield 'in a list of data' => ['{"status":200,"data":{"x":[{"a":1},{"b":1,"b":1}]},"errors":{},"meta":{}}', 200];
+        yield 'nested in errors' => ['{"status":400,"data":{},"errors":{"x":[{"a":1,"a":2}]},"meta":{}}', 400];
+        yield 'in data of a failure' => ['{"status":404,"data":{"a":1,"a":2},"errors":{},"meta":{}}', 404];
+        yield 'with the same value' => ['{"status":200,"data":{"a":1,"a":1},"errors":{},"meta":{}}', 200];
+        yield 'with an escape' => ['{"status":200,"data":{"a":1,"a":2},"errors":{},"meta":{}}', 200];
+        yield 'with an escaped slash' => ['{"status":200,"data":{"a/b":1,"a\/b":2},"errors":{},"meta":{}}', 200];
+        yield 'empty key' => ['{"status":200,"data":{"":1,"":2},"errors":{},"meta":{}}', 200];
+        yield 'numeric key' => ['{"status":200,"data":{"0":1,"x":0,"0":2},"errors":{},"meta":{}}', 200];
+        yield 'not neighbours' => ['{"status":200,"data":{"a":1,"b":2,"c":3,"a":4},"errors":{},"meta":{}}', 200];
+        yield 'after a closed object' => ['{"status":200,"data":{"a":{"b":1},"a":2},"errors":{},"meta":{}}', 200];
+        yield 'after a closed list' => ['{"status":200,"data":{"a":[1,[2]],"a":2},"errors":{},"meta":{}}', 200];
+        yield 'after a string with an escaped backslash' => ['{"status":200,"data":{"p":"\\\\","a":1,"a":2},"errors":{},"meta":{}}', 200];
+        yield 'after a string with an escaped quote' => ['{"status":200,"data":{"p":"x\"","a":1,"a":2},"errors":{},"meta":{}}', 200];
+        yield 'after a string with structure marks' => ['{"status":200,"data":{"p":"{[,:]}","a":1,"a":2},"errors":{},"meta":{}}', 200];
+        yield 'pretty printed' => ["{\n  \"status\": 200,\n  \"data\": {\n    \"a\": 1,\n    \"a\": 2\n  },\n  \"errors\": {},\n  \"meta\": {}\n}", 200];
+        yield 'deep' => ['{"status":200,"data":{"a":{"b":{"c":[{"d":{"e":1,"f":2,"e":3}}]}}},"errors":{},"meta":{}}', 200];
+    }
+
+    #[DataProvider('objectsWithAKeyTwice')]
+    public function testAnObjectWithAKeyTwiceIsNoJardisAnswerAtEveryDepth(string $body, int $status): void
+    {
+        try {
+            (new DecodeAnswer())($body, $status);
+            $this->fail('A key twice in one object must be refused.');
+        } catch (NoJardisAnswerException $refused) {
+            $this->assertStringContainsString('key twice', $refused->getMessage());
+        }
+    }
+
+    /**
+     * The counter-proof: the same key in different objects, keys that differ in case or in escape-free bytes, and
+     * texts that look like keys or numbers inside a string value are answers and come back unchanged.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function keysThatAreNotTwice(): iterable
+    {
+        yield 'case differs' => ['{"status":200,"data":{"a":1,"A":2},"errors":{},"meta":{}}'];
+        yield 'same key in sibling objects' => ['{"status":200,"data":{"x":{"a":1},"y":{"a":2},"a":3},"errors":{},"meta":{"a":4}}'];
+        yield 'same key in the elements of a list' => ['{"status":200,"data":{"x":[{"a":1},{"a":2},{"a":3}]},"errors":{},"meta":{}}'];
+        yield 'same key in a parent and its child' => ['{"status":200,"data":{"a":{"a":{"a":1}}},"errors":{},"meta":{}}'];
+        yield 'same key in data and meta' => ['{"status":200,"data":{"a":1},"errors":{},"meta":{"a":1}}'];
+        yield 'keys that look alike' => ['{"status":200,"data":{"a":1,"a ":2," a":3,"a\u0000":4,"":5," ":6},"errors":{},"meta":{}}'];
+        yield 'numeric keys that differ' => ['{"status":200,"data":{"0":1,"00":2,"x":3,"-0":4,"0.0":5},"errors":{},"meta":{}}'];
+        yield 'keys inside a string value' => ['{"status":200,"data":{"x":"\"a\":1,\"a\":2"},"errors":{},"meta":{}}'];
+        yield 'object text inside a string value' => ['{"status":200,"data":{"x":"{\"a\":1,\"a\":2}","y":"[{\"a\":1},{\"a\":2}]"},"errors":{},"meta":{}}'];
+        yield 'integer text inside a string value' => ['{"status":200,"data":{"x":"99999999999999999999","y":"-9223372036854775809 and 1e999"},"errors":{},"meta":{}}'];
+        yield 'integer text as a key' => ['{"status":200,"data":{"99999999999999999999":1,"-9223372036854775809":2},"errors":{},"meta":{}}'];
+        yield 'escaped backslashes before the closing quote' => ['{"status":200,"data":{"p":"\\\\","a":1,"q":"\\\\\\\\","b":2},"errors":{},"meta":{}}'];
+    }
+
+    #[DataProvider('keysThatAreNotTwice')]
+    public function testKeysAndNumbersThatAreNotALossAreAnswers(string $body): void
+    {
+        $response = (new DecodeAnswer())($body, 200);
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertSame($body, json_encode(EnvelopeJson::envelope($response), JSON_UNESCAPED_SLASHES));
     }
 
     public function testNestingThatTheDecoderRefusesIsNoJardisAnswer(): void
