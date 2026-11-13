@@ -282,6 +282,170 @@ class DecodeAnswerTest extends TestCase
         }
     }
 
+    /**
+     * A number without a JSON form is no value a Jardis domain writes: at any depth of `data` and `meta`, positive or
+     * negative, it is no answer - writing it back would fail with a foreign `JsonException`.
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function numbersWithoutJsonForm(): iterable
+    {
+        yield 'INF in data' => ['{"status":200,"data":{"n":1e999},"errors":{},"meta":{}}', 200];
+        yield '-INF in data' => ['{"status":200,"data":{"n":-1e999},"errors":{},"meta":{}}', 200];
+        yield 'INF nested in data' => ['{"status":200,"data":{"a":{"b":[1,{"c":1e999}]}},"errors":{},"meta":{}}', 200];
+        yield 'INF in a list of data' => ['{"status":200,"data":{"items":[[1e999]]},"errors":{},"meta":{}}', 200];
+        yield 'INF in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"duration":1e999}}', 200];
+        yield '-INF nested in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"a":{"b":-1e999}}}', 200];
+        yield 'INF in data of a failure' => ['{"status":404,"data":{"n":1e999},"errors":{},"meta":{}}', 404];
+        yield 'INF in errors' => ['{"status":403,"data":{},"errors":{"n":[1e999]},"meta":{}}', 403];
+        yield 'INF nested in errors' => ['{"status":403,"data":{},"errors":{"n":{"a":-1e999}},"meta":{}}', 403];
+    }
+
+    #[DataProvider('numbersWithoutJsonForm')]
+    public function testANumberWithoutJsonFormIsNoJardisAnswer(string $body, int $status): void
+    {
+        $this->expectException(NoJardisAnswerException::class);
+
+        (new DecodeAnswer())($body, $status);
+    }
+
+    public function testAKeyOfErrorsThatIsNoTextIsNoJardisAnswer(): void
+    {
+        $this->expectException(NoJardisAnswerException::class);
+
+        (new DecodeAnswer())('{"status":400,"data":{},"errors":{"0":"x"},"meta":{}}', 400);
+    }
+
+    #[DataProvider('partsWithTheKeysOfAList')]
+    public function testAPartWithTheKeysOfAListIsNoJardisAnswer(string $body): void
+    {
+        $this->expectException(NoJardisAnswerException::class);
+
+        (new DecodeAnswer())($body, 200);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function partsWithTheKeysOfAList(): iterable
+    {
+        yield 'data' => ['{"status":200,"data":{"0":"a","1":"b"},"errors":{},"meta":{}}'];
+        yield 'meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a"}}'];
+    }
+
+    public function testNumericKeysThatAreNotAListStayAnswers(): void
+    {
+        $bytes = '{"status":200,"data":{"0":"a","x":1},"errors":{},"meta":{"1":"a","3":"b"}}';
+
+        $response = (new DecodeAnswer())($bytes, 200);
+
+        $this->assertSame($bytes, json_encode(EnvelopeJson::envelope($response)));
+    }
+
+    public function testTheLargestNumbersAreStillAnswers(): void
+    {
+        $bytes = '{"status":200,"data":{"big":1.7976931348623157e308,"small":-1.7976931348623157e308,'
+            . '"tiny":5e-324,"over":1e19,"int":9223372036854775807},"errors":{},"meta":{}}';
+
+        $response = (new DecodeAnswer())($bytes, 200);
+
+        $this->assertIsFloat($response->getData()['big']);
+        $this->assertSame(PHP_INT_MAX, $response->getData()['int']);
+        $this->assertNotSame('', json_encode(EnvelopeJson::envelope($response), JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * The invariant of the class: what `DecodeAnswer` returns without `NoJardisAnswerException` can be written into the
+     * envelope again - in the compact form of a delivery layer and in the form of the file - without any exception.
+     * Cases: every case of the wire contract, the counterpart, the cases above and hostile values (nesting at and over
+     * the depth limit, numeric keys, odd texts, empty and huge parts).
+     *
+     * @return iterable<string, array{string, int}>
+     */
+    public static function everyBodyThatIsAnswered(): iterable
+    {
+        $document = json_decode((string) file_get_contents(self::CONTRACT), false, 512, JSON_THROW_ON_ERROR);
+        foreach ($document->cases as $case => $entry) {
+            yield 'contract ' . $case => [EnvelopeJson::encode($entry->envelope), $entry->envelope->status];
+        }
+        foreach ([201, 401, 403, 405] as $status) {
+            yield 'counterpart ' . $status => [(string) file_get_contents(self::COUNTERPART . $status . '.json'), $status];
+        }
+        foreach (self::numbersWithoutJsonForm() as $name => $case) {
+            yield 'rejected ' . $name => $case;
+        }
+        yield 'rejected errors numeric key' => ['{"status":400,"data":{},"errors":{"0":"x"},"meta":{}}', 400];
+        yield 'numeric keys in data' => ['{"status":200,"data":{"0":"a","1":"b","x":{"5":1,"7":2}},"errors":{},"meta":{}}', 200];
+        yield 'list-like object in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a"}}', 200];
+        yield 'list-like object in data' => ['{"status":200,"data":{"0":"a","1":"b"},"errors":{},"meta":{}}', 200];
+        yield 'numeric key with a name in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"0":"a","x":1}}', 200];
+        yield 'numeric keys with a gap in meta' => ['{"status":200,"data":{},"errors":{},"meta":{"1":"a","3":"b"}}', 200];
+        yield 'empty and odd keys' => ['{"status":200,"data":{"":1," ":2,"a.b":3,"\u00e4":4},"errors":{"":["x"]},"meta":{}}', 200];
+        yield 'texts' => ['{"status":200,"data":{"t":"\u00e4\ud83d\ude00\/\u0000\n"},"errors":{},"meta":{}}', 200];
+        yield 'numbers' => ['{"status":200,"data":{"a":-0,"b":-0.0,"c":0.1e1,"d":1E2,"e":123456789012345678901234567890},"errors":{},"meta":{}}', 200];
+        yield 'errors without a text form but finite' => ['{"status":500,"data":{},"errors":{"a":[true,null,1.5,{"k":[]}]},"meta":{}}', 500];
+        yield 'errors with an empty list' => ['{"status":400,"data":{},"errors":{"a":[]},"meta":{}}', 400];
+        yield 'nesting at the limit of data' => [self::nested(509), 200];
+        yield 'nesting at the limit of the decoder' => [self::nested(510), 200];
+        yield 'nesting over the limit' => [self::nested(511), 200];
+        yield 'nesting of objects at the limit' => [self::nestedObjects(509), 200];
+        yield 'nesting of objects over the limit' => [self::nestedObjects(511), 200];
+        yield 'nesting in meta at the limit' => [self::nested(509, 'meta'), 200];
+        yield 'nesting in errors at the limit' => [self::nested(509, 'errors'), 400];
+        yield 'many members' => [
+            '{"status":200,"data":{' . implode(',', array_map(static fn (int $i): string => '"k' . $i . '":' . $i, range(1, 2000)))
+            . '},"errors":{},"meta":{}}',
+            200,
+        ];
+    }
+
+    #[DataProvider('everyBodyThatIsAnswered')]
+    public function testWhatComesBackWithoutAnExceptionIsWrittenBackWithoutAnException(string $body, int $status): void
+    {
+        try {
+            $response = (new DecodeAnswer())($body, $status);
+        } catch (NoJardisAnswerException) {
+            $this->addToAssertionCount(1);
+
+            return;
+        }
+
+        $compact = json_encode(EnvelopeJson::envelope($response), JSON_THROW_ON_ERROR);
+        $file = EnvelopeJson::encode(EnvelopeJson::envelope($response));
+        $this->assertNotSame('', $compact);
+        $this->assertNotSame('', $file);
+        // and the written bytes are an answer again
+        $again = (new DecodeAnswer())($compact, $status);
+        $this->assertSame($status, $again->getStatus());
+    }
+
+    public function testNestingThatTheDecoderRefusesIsNoJardisAnswer(): void
+    {
+        $this->expectException(NoJardisAnswerException::class);
+
+        (new DecodeAnswer())(self::nested(520), 200);
+    }
+
+    /**
+     * An envelope whose part is a list nested `$depth` deep (the envelope itself and the part count as two levels).
+     */
+    private static function nested(int $depth, string $part = 'data'): string
+    {
+        $value = str_repeat('[', $depth) . '1' . str_repeat(']', $depth);
+        $parts = ['data' => '{}', 'errors' => '{}', 'meta' => '{}'];
+        $parts[$part] = '{"a":' . $value . '}';
+
+        return '{"status":' . ($part === 'errors' ? 400 : 200) . ',"data":' . $parts['data'] . ',"errors":' . $parts['errors']
+            . ',"meta":' . $parts['meta'] . '}';
+    }
+
+    private static function nestedObjects(int $depth): string
+    {
+        $value = str_repeat('{"a":', $depth) . '1' . str_repeat('}', $depth);
+
+        return '{"status":200,"data":{"a":' . $value . '},"errors":{},"meta":{}}';
+    }
+
     private function bytesOf(string $case): string
     {
         $document = json_decode((string) file_get_contents(self::CONTRACT), false, 512, JSON_THROW_ON_ERROR);

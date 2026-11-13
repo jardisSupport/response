@@ -22,10 +22,16 @@ use stdClass;
  *   {@see NoJardisAnswerException}. A fifth key is not read.
  * - `data` and `meta` come back as arrays, nested objects as arrays too; only an empty object stays an
  *   object (`stdClass`), so that it is written as `{}` again, exactly as the builders write it.
+ * - The keys of `data` and `meta` are names: an object with the keys `0`, `1`, ... without a gap reads as a list
+ *   and is {@see NoJardisAnswerException}, because it would be written as a JSON list.
+ * - A number without a JSON form (`1e999` reads as infinity, as does `-1e999`) is no value a domain writes: at any
+ *   depth of `data`, `meta` and `errors` it is {@see NoJardisAnswerException}, because writing it back would fail
+ *   with a foreign exception. What comes back without that exception can be written into the envelope again.
  * - `errors` comes back in the contract type, a list of texts per key: a text becomes a list with one entry,
- *   a list keeps its entries, any other value (number, object) becomes one entry holding its JSON text. The
- *   delivery layer of a domain answers 401 and 403 with texts and objects there; those bytes are therefore
- *   not written back identically.
+ *   a list keeps its entries, any other value (number, object) becomes one entry holding its JSON text. A key
+ *   of `errors` is the name of a context, a text: a numeric key (`{"0": ...}`) is not the contract type and is
+ *   {@see NoJardisAnswerException}. The delivery layer of a domain answers 401 and 403 with texts and objects
+ *   there; those bytes are therefore not written back identically.
  * - Events are not part of the envelope: the response carries none.
  *
  * The closure knows no field name and no status rule of its own.
@@ -64,10 +70,10 @@ final class DecodeAnswer
 
         return new DomainResponse(
             $known,
-            $this->members($this->part($envelope, 'data')),
+            $this->fields($envelope, 'data'),
             [],
             $this->errors($this->part($envelope, 'errors')),
-            $this->members($this->part($envelope, 'meta'))
+            $this->fields($envelope, 'meta')
         );
     }
 
@@ -102,7 +108,26 @@ final class DecodeAnswer
     }
 
     /**
+     * The members of `data` or `meta`. An object whose keys are `0`, `1`, ... without a gap reads as a list in PHP and
+     * would be written as a JSON list, which is not the object the envelope needs: no domain writes that.
+     *
      * @return array<string, mixed>
+     */
+    private function fields(stdClass $envelope, string $key): array
+    {
+        $fields = $this->members($this->part($envelope, $key));
+        if ($fields !== [] && array_is_list($fields)) {
+            throw new NoJardisAnswerException(
+                sprintf('The key "%s" of the envelope has the keys of a list, not the names of an object.', $key)
+            );
+        }
+
+        /** @var array<string, mixed> $fields a numeric key with a name beside it stays an object */
+        return $fields;
+    }
+
+    /**
+     * @return array<int|string, mixed> PHP turns the key `"0"` into the number 0
      */
     private function members(stdClass $object): array
     {
@@ -116,6 +141,10 @@ final class DecodeAnswer
 
     private function plain(mixed $value): mixed
     {
+        if (is_float($value) && !is_finite($value)) {
+            throw new NoJardisAnswerException('A number of the envelope has no JSON form (infinite or not a number).');
+        }
+
         if ($value instanceof stdClass) {
             return get_object_vars($value) === [] ? $value : $this->members($value);
         }
@@ -130,7 +159,12 @@ final class DecodeAnswer
     {
         $errors = [];
         foreach (get_object_vars($object) as $name => $value) {
-            $errors[(string) $name] = array_map($this->text(...), is_array($value) ? array_values($value) : [$value]);
+            if (is_int($name)) {
+                throw new NoJardisAnswerException(
+                    sprintf('The key "%d" of "errors" is no text: the name of a context is a text.', $name)
+                );
+            }
+            $errors[$name] = array_map($this->text(...), is_array($value) ? array_values($value) : [$value]);
         }
 
         return $errors;
