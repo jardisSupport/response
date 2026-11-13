@@ -1,0 +1,1 @@
+{"status":201,"data":{"@type":"order","id":1,"orderNumber":"ORD-001","customerIdentifier":"<generated identifier>","orderItemIdentifiers":["<generated identifier>","<generated identifier>"]},"errors":{},"meta":{"duration":0,"contexts":["CreateOrder","PersistOrder"],"timestamp":"2026-01-15T10:30:00+00:00","version":""}}

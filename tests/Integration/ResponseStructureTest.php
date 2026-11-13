@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 /**
- * The package holds exactly the documented 63 classes (MODELL section 5, plus the answer closures of E2-P7, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`, `ProjectOutcome`, `OutcomeForm`, `RequireResource` and the request readers): no more, no fewer, each
+ * The package holds exactly the documented 66 classes (MODELL section 5, plus the answer closures of E2-P7, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`, `ProjectOutcome`, `OutcomeForm`, `RequireResource`, the request readers, `DecodeAnswer`, `RequireLosslessBody` and `NoJardisAnswerException`): no more, no fewer, each
  * one loadable under `JardisSupport\Response\...`.
  */
 class ResponseStructureTest extends TestCase
@@ -28,6 +28,7 @@ class ResponseStructureTest extends TestCase
         'Data\\Response\\OutcomeForm',
         'Data\\RuleResult',
         'Exception\\ConfigurationException',
+        'Exception\\NoJardisAnswerException',
         'Handler\\Answer\\AnswerCommand',
         'Handler\\Answer\\AnswerFindings',
         'Handler\\Answer\\AnswerInvalidRequest',
@@ -71,10 +72,12 @@ class ResponseStructureTest extends TestCase
         'Handler\\Request\\ReadTransportOptional',
         'Handler\\Request\\RebaseFindings',
         'Handler\\Response\\BuildResponseData',
+        'Handler\\Response\\DecodeAnswer',
         'Handler\\Response\\ProjectAnswer',
         'Handler\\Response\\ProjectAnswerRows',
         'Handler\\Response\\ProjectOutcome',
         'Handler\\Response\\ProjectRows',
+        'Handler\\Response\\RequireLosslessBody',
         'Handler\\Response\\ReshapeAnswer',
         'Handler\\Response\\TransformResponse',
     ];
@@ -91,7 +94,7 @@ class ResponseStructureTest extends TestCase
         }
         sort($found);
 
-        $this->assertCount(63, self::CLASSES);
+        $this->assertCount(66, self::CLASSES);
         $this->assertSame(self::CLASSES, $found);
         foreach (self::CLASSES as $short) {
             $class = new ReflectionClass('JardisSupport\\Response\\' . $short);
