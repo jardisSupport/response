@@ -4,6 +4,16 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.3.0 — 2026-11-13
+
+### Added
+- `Handler/Response/DecodeAnswer`: `__invoke(string $body, int $status): DomainResponseInterface`, no constructor - reads the answer of another Jardis domain (body text and status code, no HTTP message type) back into a `DomainResponseInterface`, the counterpart of the builders of the envelope `{status, data, errors, meta}`. A 204 without a body answers an empty response with status 204. Every other status needs a JSON body with the four keys, `data`, `errors` and `meta` as objects, and the `status` of the envelope equal to the given status. `data` and `meta` come back as arrays (nested objects too); only an empty object stays an object, so it is written as `{}` again. `errors` comes back in the contract type (a list of texts per key: a text becomes a list with one entry, any other value its JSON text). The response carries no events. Round trip envelope bytes -> `DecodeAnswer` -> response -> envelope bytes is byte-identical for the eleven cases of `wire-contract.json`, in the form of the file and in the compact form of `jardiscore/app`; 201 and 204 round trip too. 401 and 403 are excluded from byte equality: the delivery layer of a domain writes `errors` there as texts and objects, which the reader normalises.
+- `Exception/NoJardisAnswerException`: `final`, extends `\RuntimeException` - raised by `DecodeAnswer` when body and status are not the answer of a Jardis domain (not JSON, a key of the envelope missing, HTTP status differs from the `status` of the envelope, a status outside `ResponseStatus` such as 502 or 302, a 204 with a body). The caller treats it as a transport failure. The package holds 65 classes (was 63).
+- Tests: `tests/Integration/Response/DecodeAnswerTest`; the bytes of the counterpart for 201, 401, 403 and 405 as `tests/Fixture/Counterpart/*.json` (read from the delivery layer `jardiscore/app` v3.3.1) with their origin in `ORIGIN.md`.
+
+### Unchanged
+- Every existing class and signature, `composer.json` (no new dependency), `tests/Smoke/Contract/wire-contract.json` (byte-identical). Minor, additive.
+
 ## 4.2.3 — 2026-11-06
 
 ### Changed

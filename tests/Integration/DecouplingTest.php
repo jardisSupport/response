@@ -282,6 +282,9 @@ class DecouplingTest extends TestCase
         'Handler\\Response\\BuildResponseData' => [
             '__invoke(ResponseStatus $status, object $response, ?string $declaredMessageKey, string $processName): array',
         ],
+        'Handler\\Response\\DecodeAnswer' => [
+            '__invoke(string $body, int $status): DomainResponseInterface',
+        ],
         'Handler\\Response\\ProjectAnswer' => [
             '__construct(ReshapeAnswer $reshapeAnswer = …)',
             '__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface',
@@ -379,7 +382,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(63, $classes);
+        $this->assertCount(65, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
@@ -424,6 +427,9 @@ class DecouplingTest extends TestCase
         $this->assertTrue($kind('Data\\Response\\DomainResponse')->isReadOnly());
         $this->assertTrue($kind('Exception\\ConfigurationException')->isFinal());
         $this->assertSame(\RuntimeException::class, $kind('Exception\\ConfigurationException')->getParentClass()->getName());
+        $this->assertTrue($kind('Exception\\NoJardisAnswerException')->isFinal());
+        $this->assertSame(\RuntimeException::class, $kind('Exception\\NoJardisAnswerException')->getParentClass()->getName());
+        $this->assertNull($kind('Handler\\Response\\DecodeAnswer')->getConstructor());
         $this->assertSame('process.inputInvalid', $kind('Handler\\Door\\ValidateInput')->getConstant('MESSAGE_KEY'));
         $this->assertSame('process.transientConflict', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_KEY'));
         $this->assertSame('stale_write', $kind('Handler\\Failure\\MapThrowable')->getConstant('CONFLICT_REASON'));

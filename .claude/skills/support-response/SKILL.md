@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: "jardissupport/response 4.2 - one shape for the answer of a request-response use case: Response objects, failure forms 400/404/409/422, envelope data, read answers, door steps, request mapper. Use when working with ValidateInput, MapThrowable, AnswerInvalidRequest, BuildResponseData."
+description: "jardissupport/response 4.3 - one shape for the answer of a request-response use case: Response objects, failure forms 400/404/409/422, envelope data, read answers, door steps, request mapper, reading the answer of another Jardis domain. Use when working with ValidateInput, MapThrowable, AnswerInvalidRequest, BuildResponseData, DecodeAnswer."
 user-invocable: false
 zone: post-active
 persona: C
@@ -10,14 +10,14 @@ next: [support-workflow, generated-code-workflow-api]
 
 ## Triggers
 
-jardissupport/response 4.2 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker) the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
+jardissupport/response 4.3 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker), reading the answer of another Jardis domain (DecodeAnswer, NoJardisAnswerException), the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, DecodeAnswer, the answer of another Jardis domain, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
 
 # RESPONSE_COMPONENT_SKILL
-> `jardissupport/response` 4.2.1 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
+> `jardissupport/response` 4.3.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, @outcome, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, @outcome, DecodeAnswer, NoJardisAnswerException, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -104,9 +104,23 @@ if ($fields !== []) { return (new AnswerInvalidRequest($clock))($fields, $versio
 
 **Constructor dependencies (ports, no new runtime dependency):** the six calendar accept closures (`TransportDate|DateTime|Time`, `BodyDate|DateTime|Time`) take a `ValueValidatorInterface` (pass the `DateTime` validator of `jardissupport/validation`); `AnswerInvalidRequest` takes a PSR-20 `ClockInterface`. Both are required, so `Factory::get()` cannot create them without a registered instance; readers and the other accept closures are creatable without arguments. Not in this package (stay in `jardiscore/app`): `ParseJsonBody`, `CreateServerRequest`, `ResolveVersion`.
 
+## Reading the answer of another domain (from 4.3.0)
+
+Hand-written code that called another Jardis domain over HTTP turns the reply back into a `DomainResponseInterface` with `DecodeAnswer` - body text and status code in, no PSR-7 type, no constructor. It is the one class of the package (with `NoJardisAnswerException`) that domain code may import.
+
+```php
+try {
+    $answer = (new DecodeAnswer())((string) $reply->getBody(), $reply->getStatusCode());   // 200..500 of the envelope, 204 without body
+} catch (NoJardisAnswerException $e) {
+    // not JSON / key missing / HTTP status != envelope status / status outside ResponseStatus (502, 302): a transport failure, not an answer
+}
+```
+
+401, 403 and 405 come from the delivery layer of the other domain in the same envelope; their `errors` (texts and objects there) are normalised to a list of texts per key, so those bytes are not written back identically. Events are not in the envelope: the response carries none.
+
 ## Full reference
 
-All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 65 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
@@ -136,6 +150,8 @@ All 61 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Door\ValidateInput` | `public const string MESSAGE_KEY = 'process.inputInvalid'`; `__construct(ValidatorInterface $validator, DescribeFieldFinding = new)`; `__invoke(object $input): InputFindings`; field paths below the input root (`customer`, `items[1].qty`), root name `lcfirst(shortName)` |
 | `Data\RuleResult` | `final readonly`; `pass()`, `reject(string $rule, string $messageKey, array $context = [])`; public `passed rule messageKey context` |
 | `Handler\Failure\LogFailure` | `__construct(?LoggerInterface $logger = null, ?LogCause = null)`; `__invoke(\Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void` - logs (`LogCause`) only when `$owner` and the answer is a 5xx |
+| `Handler\Response\DecodeAnswer` | `final`, no constructor; `__invoke(string $body, int $status): DomainResponseInterface` - reads the answer of another Jardis domain (body text and status code, no HTTP type; the caller hands in what its client returned): 204 without body = empty answer, status 204; every other status needs a JSON object with `status`, `data`, `errors`, `meta` (the last three objects) and `status` of the envelope = `$status`; `$status` must be a `ResponseStatus`; `data`/`meta` as arrays (nested objects too, only an empty object stays `stdClass`, so it is written as `{}` again), `errors` as list of texts per key (text -> one entry, number/object -> its JSON text), no events; round trip with the envelope encoder is byte-identical for the cases of `wire-contract.json`, **except 401 and 403** (the delivery layer writes `errors` there as texts and objects); anything else -> `NoJardisAnswerException` (transport failure for the caller); the only class besides its exception that domain code may import |
+| `Exception\NoJardisAnswerException` | `final`, extends `\RuntimeException` - body and status are not the answer of a Jardis domain: no JSON, a key of the envelope missing, HTTP status differs from the `status` of the envelope, status outside `ResponseStatus` (502, 302), a 204 with a body; `getPrevious()` is the `\JsonException` for unreadable JSON |
 | `Handler\Response\ProjectAnswer` | `final`; `__construct(ReshapeAnswer = new)`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
 | `Handler\Response\ProjectRows` | `final`; `__invoke(array $rows, string ...$fields): array` (`list<array<string,mixed>>`) - row cut of a list: each row keeps exactly the named keys in `$fields` order, nothing added, `null` stays; **unlike `ProjectAnswer` a missing key is drift**: `\UnexpectedValueException` with row index and field (also `$rows` no list, row no array) -> `MapThrowable` 500; empty `$fields` -> `\InvalidArgumentException`; knows no field name of its own |
 | `Handler\Response\ReshapeAnswer` | `final`; `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - 2xx: new `DomainResponse` with `$step(data)`, status/errors/metadata/events of every scope carried over; non-2xx = the same instance, step not called; knows no field name; `ProjectAnswer` is built on it |

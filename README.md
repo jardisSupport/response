@@ -14,12 +14,13 @@ Status: 1.0.0 in preparation, not released.
 | Door steps | `Handler/Door/{ValidateInput, RequireResource}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
 | Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
+| Read the answer of another domain | `Handler/Response/DecodeAnswer` (body text and status code to `DomainResponseInterface`; see below), `Exception/NoJardisAnswerException` (not the answer of a Jardis domain) |
 | Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Outcome form | `Data/Response/OutcomeForm` (readonly `fields` in wire order, `rowCuts` field => row keys; names only, no wire types), used by `ProjectOutcome` (see below) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-63 classes, every handler `final` with exactly one public entry point (`__invoke`).
+65 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -84,6 +85,16 @@ $outer = ($this->handle(ProjectOutcome::class))($inner, [
 ```
 
 `RequireResource($resource, string $name)` is a door step: a resource the kernel does not provide (`null`) raises `ConfigurationException` (`Required resource "<name>" is not provided by the kernel`, the door answers it through `MapThrowable` as 500); otherwise the very same object comes back.
+
+## Reading the answer of another domain
+
+`DecodeAnswer` is the way back from the wire: `(new DecodeAnswer())($body, $status)` takes the body text and the status code a client returned (no PSR-7 type, the package knows no HTTP) and answers the `DomainResponseInterface` the other domain built. A 204 without a body is an empty answer with status 204. Every other answer needs a JSON object with `status`, `data`, `errors`, `meta` (the last three objects) whose `status` equals the given one. `data` and `meta` come back as arrays (nested objects too, only an empty object stays an object so that it is written as `{}` again), `errors` in the contract type (a list of texts per key; a text becomes a list with one entry, any other value its JSON text), and the response carries no events. Written back with the encoder of the envelope, the bytes are identical for every case of the wire contract; 401 and 403 are the exception because the delivery layer (`jardiscore/app`) writes `errors` there as texts and objects.
+
+What is not the answer of a Jardis domain - not JSON, a key of the envelope missing, the HTTP status differs from the `status` of the envelope, a status outside `ResponseStatus` (a gateway 502, a redirect 302), a 204 with a body - raises `NoJardisAnswerException` (`final`, extends `\RuntimeException`); the caller treats it as a failure of the transport. Domain code may import `DecodeAnswer` and `NoJardisAnswerException`.
+
+```php
+$answer = (new DecodeAnswer())((string) $httpResponse->getBody(), $httpResponse->getStatusCode());   // DomainResponseInterface
+```
 
 ## Request mapper
 
