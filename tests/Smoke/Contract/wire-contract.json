@@ -170,6 +170,28 @@
                 }
             }
         },
+        "403": {
+            "process": "OrderBulkQuote",
+            "scenario": "the caller may not do this: AnswerForbidden answers 403, the payload (right) sits in data, errors stay empty",
+            "envelope": {
+                "status": 403,
+                "data": {
+                    "@type": "forbidden",
+                    "context": {
+                        "right": "order.quote"
+                    }
+                },
+                "errors": {},
+                "meta": {
+                    "duration": 0.0,
+                    "contexts": [
+                        "OrderBulkQuoteHandler"
+                    ],
+                    "timestamp": "2026-01-15T10:30:00+00:00",
+                    "version": ""
+                }
+            }
+        },
         "404": {
             "process": "RegisterAndReviseServiceOptOut",
             "scenario": "second call node: the callee answers 404, declared key",

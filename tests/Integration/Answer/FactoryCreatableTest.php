@@ -7,6 +7,7 @@ namespace JardisSupport\Response\Tests\Integration\Answer;
 use JardisSupport\Factory\Factory;
 use JardisSupport\Response\Handler\Answer\AnswerCommand;
 use JardisSupport\Response\Handler\Answer\AnswerFindings;
+use JardisSupport\Response\Handler\Answer\AnswerForbidden;
 use JardisSupport\Response\Handler\Answer\AnswerNotFound;
 use JardisSupport\Response\Handler\Answer\AnswerOutcome;
 use JardisSupport\Response\Handler\Answer\AnswerRead;
@@ -30,6 +31,7 @@ class FactoryCreatableTest extends TestCase
         $classes = [
             AnswerFindings::class,
             AnswerNotFound::class,
+            AnswerForbidden::class,
             AnswerRuleViolation::class,
             AnswerOutcome::class,
             AnswerThrowable::class,

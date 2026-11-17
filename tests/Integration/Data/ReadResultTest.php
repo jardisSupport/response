@@ -72,4 +72,53 @@ class ReadResultTest extends TestCase
         $this->assertNull($result->first());
         $this->assertTrue($result->isEmpty());
     }
+
+    public function testOfCappedListUnderTheCapKeepsTheExactCount(): void
+    {
+        $result = ReadResult::ofCappedList(['a', 'b'], 7, 10);
+
+        $this->assertSame(['a', 'b'], $result->items());
+        $this->assertSame(7, $result->total());
+        $this->assertFalse($result->isCapped());
+    }
+
+    public function testOfCappedListExactlyAtTheCapIsNotCapped(): void
+    {
+        $result = ReadResult::ofCappedList(['a'], 10, 10);
+
+        $this->assertSame(10, $result->total());
+        $this->assertFalse($result->isCapped());
+    }
+
+    public function testOfCappedListBeyondTheCapReportsTheCapAndIsCapped(): void
+    {
+        $result = ReadResult::ofCappedList(['a', 'b'], 11, 10);
+
+        $this->assertSame(['a', 'b'], $result->items());
+        $this->assertSame(10, $result->total());
+        $this->assertTrue($result->isCapped());
+    }
+
+    public function testOfCappedListRejectsCapSmallerThanItems(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        ReadResult::ofCappedList(['a', 'b', 'c'], 5, 2);
+    }
+
+    public function testOfCappedListAcceptsAnEmptyListWithCapZero(): void
+    {
+        $result = ReadResult::ofCappedList([], 0, 0);
+
+        $this->assertSame(0, $result->total());
+        $this->assertFalse($result->isCapped());
+        $this->assertTrue($result->isEmpty());
+    }
+
+    public function testOfListAndOfOneAreNeverCapped(): void
+    {
+        $this->assertFalse(ReadResult::ofList(['a'], 99)->isCapped());
+        $this->assertFalse(ReadResult::ofOne('a')->isCapped());
+        $this->assertFalse(ReadResult::ofOne(null)->isCapped());
+    }
 }

@@ -9,6 +9,7 @@ use DateTimeZone;
 use JardisSupport\Contract\Kernel\DomainResponseInterface;
 use JardisSupport\Contract\Kernel\ResponseStatus;
 use JardisSupport\Response\Data\Response\ContextResponse;
+use JardisSupport\Response\Handler\Answer\AnswerForbidden;
 use JardisSupport\Response\Handler\Door\ValidateInput;
 use JardisSupport\Response\Handler\Failure\BuildFailureOutcome;
 use JardisSupport\Response\Handler\Failure\MapThrowable;
@@ -26,11 +27,11 @@ use PHPUnit\Framework\TestCase;
 /**
  * The wire contract of the package: the envelope bytes a door answers per status.
  *
- * `Contract/wire-contract.json` holds, for the eleven cases 200, 200-empty (a last node without an answer of
+ * `Contract/wire-contract.json` holds, for the twelve cases 200, 200-empty (a last node without an answer of
  * its own: `data` carries only the `@type`), 200-merged (the answer is the data of all nodes united in run order,
  * the later node wins on the same field), 200-answer-class (merged with a process answer class: the union is
  * projected onto the declared fields, foreign data of the last node falls away), 200-datetime-offset (the answer holds an instant with a non-UTC offset,
- * the wire carries it in UTC), 400, 404, 409, 422, 404-rule-subject (the subject of a rule cannot be loaded: a 404, never a rule verdict) and 500, the envelope (status, data, errors, meta)
+ * the wire carries it in UTC), 400, 403 (an answer, not an exception: the payload sits in `data`, `errors` stays empty), 404, 409, 422, 404-rule-subject (the subject of a rule cannot be loaded: a 404, never a rule verdict) and 500, the envelope (status, data, errors, meta)
  * of the process handler. Every 2xx answer carries the name of its outcome as `@outcome` right behind `@type`
  * (the `gives.name` of the end node the builder fixture of the same process ends on; `200-answer-class` has no
  * builder counterpart, its neutral name `shipped` is the outcome the sub-process step of the case ends on).
@@ -72,6 +73,7 @@ class WireContractTest extends TestCase
             ['200-answer-class', 200],
             ['200-datetime-offset', 200],
             ['400', 400],
+            ['403', 403],
             ['404', 404],
             ['409', 409],
             ['422', 422],
@@ -114,6 +116,7 @@ class WireContractTest extends TestCase
                 '200-answer-class' => $this->case('OrderShipment', 'merged with a process answer class: the last node is a sub-process with a foreign answer, only the declared fields reach the wire', $this->successAnswerClass()),
                 '200-datetime-offset' => $this->case('VoucherOverview', 'last node answers an instant with the offset +02:00 in vouchers[].createdAt, the wire carries it in UTC', $this->successWithOffsetDate()),
                 '400' => $this->case('OrderBulkQuote', 'start check: malformed input fields, no node runs', $this->invalidInput()),
+                '403' => $this->case('OrderBulkQuote', 'the caller may not do this: AnswerForbidden answers 403, the payload (right) sits in data, errors stay empty', $this->forbidden()),
                 '404' => $this->case('RegisterAndReviseServiceOptOut', 'second call node: the callee answers 404, declared key', $this->revisionTargetMissing()),
                 '409' => $this->case('RegisterAndReviseServiceOptOut', 'first call node: the callee answers 409, declared key', $this->registrationClash()),
                 '422' => $this->case('VoucherRedeemCheck', 'rule node: the voucher exists, the rule rejects it, rule violation', $this->ruleViolation()),
@@ -286,6 +289,14 @@ class WireContractTest extends TestCase
             (new BuildResponseData())(ResponseStatus::ValidationError, $form, null, 'OrderBulkQuote'),
             $findings->errors
         );
+    }
+
+    private function forbidden(): DomainResponseInterface
+    {
+        $result = new ContextResponse('OrderBulkQuoteHandler');
+        $clock = new FixedClock(new DateTimeImmutable(EnvelopeCases::FIXED_AT, new DateTimeZone('UTC')));
+
+        return (new AnswerForbidden())($result, new TransformResponse($clock, ''), ['right' => 'order.quote']);
     }
 
     private function ruleViolation(): DomainResponseInterface

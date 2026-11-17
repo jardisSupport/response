@@ -74,7 +74,7 @@ try {
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
 | 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (10 cases, every 2xx case carries `@outcome` behind `@type`: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+The wire contract `tests/Smoke/Contract/wire-contract.json` (12 cases, every 2xx case carries `@outcome` behind `@type`: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 403, 404, 409, 422, 404-rule-subject, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
 
 ## Outcome projection (`@outcome`, from 4.2.0)
 
@@ -120,23 +120,25 @@ try {
 
 ## Full reference
 
-All 66 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 69 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
 | `Data\Response\ContextResponse` | `__construct(string $context)`; `addData(string, mixed): self`, `setData(array): self`, `getData(): array`, `addEvent(object, EventScope = Internal): self`, `getEvents(?EventScope = null): array`, `addError(string): self`, `getErrors(): array`, `addResult(ContextResponseInterface): self`, `getResults(): array` |
 | `Data\Response\DomainResponse` | `readonly`; `__construct(ResponseStatus, array $data, array $events, array $errors, array $metadata, array $eventsByScope = [])`; `isSuccess() getStatus(): int getData() getEvents(?EventScope) getErrors() getMetadata()` |
-| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofOne(mixed $item)`; `items() total() first() isEmpty()` |
+| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
 | `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [], string $identifier = 'id')`; `root() children() identifier()` - answered as `{@type, <identifier>: root, <child key>: scalar\|null\|list}` |
 | `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`**; `failed(): bool` answers the same |
 | `Data\MappedFailure` | `final readonly`; `__construct(public ResponseStatus $status, public FailureForm\|\stdClass $response)` |
 | `Data\Failure\FailureForm` | interface: `status(): ResponseStatus`, `messageKey(): string`, `context(): array` |
 | `Data\Failure\ValidationFailure` | `__construct(string $messageKey, array $fields, array $context = [])`; `fields()` |
+| `Data\Failure\Forbidden` | `__construct(string $messageKey, array $context = [])` (403; answered by `AnswerForbidden`) |
 | `Data\Failure\NotFound` | `__construct(string $messageKey, array $context = [])` |
 | `Data\Failure\Conflict` | `__construct(string $messageKey, array $context = [], ?string $reason = null, ?string $aggregate = null, array $violated = [])`; `reason() aggregate() violated()` |
 | `Data\Failure\RuleViolation` | `__construct(string $rule, string $messageKey, array $context = [])`; `rule()` |
 | `Exception\ConfigurationException` | `final`, extends `\RuntimeException` - unusable runtime wiring (generated `requires` lines) |
 | `Handler\Failure\ValidationPayload` | `__invoke(string $messageKey, array $fields, array $context = []): ValidationFailure` |
+| `Handler\Failure\ForbiddenPayload` | `__invoke(string $messageKey, array $context): Forbidden` |
 | `Handler\Failure\NotFoundPayload` | `__invoke(string $messageKey, array $context): NotFound` |
 | `Handler\Failure\ConcurrencyConflictPayload` | `__invoke(string $messageKey, string $reason, string $aggregate, array $context, array $violated): Conflict` |
 | `Handler\Failure\RuleViolationPayload` | `__invoke(string $rule, string $messageKey, array $context): RuleViolation` |
@@ -162,6 +164,7 @@ All 66 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | `Handler\Door\RequireResource` | `final`; `__invoke(?object $resource, string $name): object` - `null` -> `ConfigurationException('Required resource "<name>" is not provided by the kernel')`, else the same object |
 | `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
 | `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
+| `Handler\Answer\AnswerForbidden` | `final`, `MESSAGE_KEY = 'forbidden'`; `__invoke($result, $transform, array $context)` -> 403 `{@type: forbidden, context}`, `errors` empty - an answer, not an exception, and not the door rejection of `RequireRight` |
 | `Handler\Answer\AnswerRuleViolation` | `__invoke($result, $transform, RuleResult $rejection)` -> 422 `{@type: ruleViolation, rule, messageKey, context}` |
 | `Handler\Answer\AnswerOutcome` | `__invoke($result, $transform, AnswerableOutcomeInterface $outcome, string $processName)` - Domain events and errors into the result, then response (success) or failure form of the reject, under the outcome's status; no engine type |
 | `Handler\Answer\AnswerThrowable` | `__invoke($result, $transform, \Throwable $failure, bool $owner, string $aggregate)` - `MapThrowable` + `BuildResponseData`; throws on what is not the owner's to answer; logs nothing |
@@ -209,11 +212,11 @@ Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller
 | 2 | `MapThrowable` with `$owner = false` throws only `TransientConflictException` and 5xx causes; it never throws a 4xx - markers (conflict, validation) are always mapped (a rejection is an answer, not an exception) | `Handler/Failure/MapThrowable.php` match arms |
 | 3 | The owner is decided by the caller (no transaction open on entry), not by the package; `LogCause` logs what it is given - call it once, only for the owner and only for a 5xx; a cause with the marker `ReportedFailureExceptionInterface` is skipped (already reported) | `Handler/Failure/LogCause.php` |
 | 4 | Valid input is exactly `fields === []`; `errors` is only the validator's texts. A result that is invalid but yields no field findings reads as valid | `Data/InputFindings.php`, `Handler/Door/ValidateInput.php` |
-| 5 | The package produces no 401 and no 403 (3.0.0): the delivery layer answers them before the domain runs; a node reject with the declared status 401/403 is flat like any other 4xx; a thrown access marker is an unknown failure (500 for the owner) | `Handler/Response/BuildResponseData.php`, `Handler/Failure/MapThrowable.php` |
+| 5 | The package produces no 401 (3.0.0) and no 403 on its own: the delivery layer answers them before the domain runs. A door that has to answer a refusal as a value calls `AnswerForbidden` (403, `{@type: forbidden, context}`, `errors` empty); `MapThrowable` and `BuildFailureOutcome` still make no 403. A node reject with the declared status 401/403 is flat like any other 4xx; a thrown access marker is an unknown failure (500 for the owner) | `Handler/Response/BuildResponseData.php`, `Handler/Failure/MapThrowable.php` |
 | 6 | `BuildResponseData` does not project dates; hand the result to `ProjectWire` before the envelope | `Handler/Response/BuildResponseData.php` docblock |
 | 7 | A 4xx without a failure form (401, 403, 405) answers `{messageKey, context}` unless `declared`; the key reaches the wire only when declared | `Handler/Failure/BuildFailureOutcome.php` |
 | 8 | `BuildFailureForm` cuts the context keys it knows (`fields`; `reason/aggregate/violated`; `rule`) - the rest travels as `context` of the form | `Handler/Failure/BuildFailureForm.php` |
-| 9 | `ReadResult::ofList` with `total` smaller than the items throws `\InvalidArgumentException` | `Data/ReadResult.php` |
+| 9 | `ReadResult::ofList` with `total` smaller than the items and `ofCappedList` with `cap` smaller than the items throw `\InvalidArgumentException`; `ofCappedList` reports at most `cap` as `total()` and `isCapped()` says the cap was hit | `Data/ReadResult.php` |
 | 10 | A calendar accept closure without its `ValueValidatorInterface` or `AnswerInvalidRequest` without its clock does not construct - there is no default, the package has no runtime dependency on `validation`/`scheduling`; pass them (`new BodyDate(new DateTime())`, `new AnswerInvalidRequest($clock)`) | `Handler/Request/Accept/BodyDate.php`, `Handler/Answer/AnswerInvalidRequest.php` |
 | 11 | The wire contract file is the one shipped test path; changing it is a breaking change of the wire (major version) | `.gitattributes`, `tests/Smoke/WireContractTest.php` |
 | 12 | `ProjectOutcome` fails loudly on a 2xx answer without `@outcome` or with an unknown outcome - it never falls back to a default form | `Handler/Response/ProjectOutcome.php` |
