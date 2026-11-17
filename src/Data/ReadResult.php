@@ -17,6 +17,7 @@ final readonly class ReadResult
     private function __construct(
         private array $items,
         private int $total,
+        private bool $capped = false,
     ) {
     }
 
@@ -37,6 +38,31 @@ final readonly class ReadResult
         }
 
         return new self($items, $total);
+    }
+
+    /**
+     * A list whose count stops at a cap: `$counted` is how many rows the count reached (it may stop at
+     * `cap + 1`, the exact number is not needed). At most `$cap` is reported: `total()` is `$counted`
+     * while it does not exceed the cap, else the cap, and `isCapped()` says the cap was hit.
+     *
+     * @template U
+     * @param list<U> $items
+     * @return self<U>
+     * @throws \InvalidArgumentException when $cap is smaller than the number of items
+     */
+    public static function ofCappedList(array $items, int $counted, int $cap): self
+    {
+        if ($cap < count($items)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Cap %d is smaller than the %d given items',
+                $cap,
+                count($items)
+            ));
+        }
+
+        $capped = $counted > $cap;
+
+        return new self($items, $capped ? $cap : $counted, $capped);
     }
 
     /**
@@ -63,6 +89,14 @@ final readonly class ReadResult
     public function total(): int
     {
         return $this->total;
+    }
+
+    /**
+     * True when the count was cut at a cap: `total()` is then the cap, the real number is higher.
+     */
+    public function isCapped(): bool
+    {
+        return $this->capped;
     }
 
     /**

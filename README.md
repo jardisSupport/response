@@ -9,18 +9,18 @@ Status: 1.0.0 in preparation, not released.
 | Group | Content |
 |---|---|
 | Response objects | `Data/Response/ContextResponse`, `Data/Response/DomainResponse`, `Handler/Response/TransformResponse` (context response to `DomainResponseInterface`, injected PSR-20 clock) |
-| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
+| Failure forms | `Data/Failure/{FailureForm, ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation}`, `Handler/Failure/{BuildFailureForm, BuildFailureOutcome, ValidationPayload, ForbiddenPayload, NotFoundPayload, ConcurrencyConflictPayload, RuleViolationPayload, DescribeFieldFinding}` |
 | Envelope data | `Handler/Response/BuildResponseData` (the `data` of the envelope from status, response, declared message key and process name; no wire projection) |
 | Door steps | `Handler/Door/{ValidateInput, RequireResource}`, `Handler/Failure/{MapThrowable, LogCause, LogFailure}`; results `Data/InputFindings`, `Data/MappedFailure` |
-| Answer closures | `Handler/Answer/{AnswerFindings, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
+| Answer closures | `Handler/Answer/{AnswerFindings, AnswerForbidden, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read the answer of another domain | `Handler/Response/DecodeAnswer` (body text and status code to `DomainResponseInterface`; see below), `Handler/Response/RequireLosslessBody` (refuses what the decoder would lose: integer beyond 64 bits, underflow to zero, key twice; fails closed), `Exception/NoJardisAnswerException` (not the answer of a Jardis domain) |
-| Read and write answers | `Data/ReadResult` (list with total, or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
+| Read and write answers | `Data/ReadResult` (list with total, a list with a capped total (`ofCappedList`, `isCapped()`), or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
 | Outcome form | `Data/Response/OutcomeForm` (readonly `fields` in wire order, `rowCuts` field => row keys; names only, no wire types), used by `ProjectOutcome` (see below) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-66 classes, every handler `final` with exactly one public entry point (`__invoke`).
+69 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 
@@ -42,6 +42,7 @@ A door answers by calls only: no loop, no status comparison, no data assembly. E
 | Closure | Situation | Status |
 |---|---|---|
 | `AnswerFindings($result, $transform, InputFindings)` | the input check found failing fields | 400 |
+| `AnswerForbidden($result, $transform, array $context)` | the caller may not do this; the context names what was refused (payload in `data`, `errors` empty) | 403 |
 | `AnswerNotFound($result, $transform, array $context)` | the addressed aggregate does not exist | 404 |
 | `AnswerRuleViolation($result, $transform, RuleResult)` | a business rule rejected the request | 422 |
 | `AnswerOutcome($result, $transform, AnswerableOutcomeInterface, string $processName)` | a process run ended: its Domain events and errors, then the response (200) or the failure form of the reject (4xx) | outcome status |
@@ -127,7 +128,7 @@ if ($fields !== []) {
 
 ## Failure forms on the wire
 
-The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: the process `VoucherOverview`, `vouchers[].createdAt`), 400, 404, 409, 422, 500) and ships with the package. Every 2xx case carries `@outcome` behind `@type`; the bytes of 4xx and 5xx are unchanged. 500 answers `data: {}`. The package produces neither a 401 nor a 403: the delivery layer answers them (`RequireSession`, `RequireRight`); a node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
+The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/Contract/wire-contract.json`) fixes its bytes per status (200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: the process `VoucherOverview`, `vouchers[].createdAt`), 400, 403, 404, 404-rule-subject, 409, 422, 500) and ships with the package. Every 2xx case carries `@outcome` behind `@type`; the bytes of 4xx and 5xx are unchanged. 500 answers `data: {}`. The package produces no 401: the delivery layer answers it (`RequireSession`); the door rejection of `RequireRight` is not made here either. A 403 as a value is `AnswerForbidden`; `MapThrowable` and `BuildFailureOutcome` make none. A node reject with the declared status 401 or 403 stays a flat reject like any other 4xx.
 
 **400** `ValidationFailure`
 
@@ -138,6 +139,12 @@ The envelope is `{status, data, errors, meta}`; the wire contract (`tests/Smoke/
 ```
 
 The reasons of a field finding are `missing`, `invalid` (validator), `type` and `unknown` (request reader); each is answered with the key `validation.<reason>` and, when the caller delivered no text, its standard text (`Field is required.`, `Field is invalid.`, `Field has an invalid type.`, `Unknown field`). Any other reason is answered as `invalid`. `DescribeFieldFinding` is the one place of this vocabulary.
+
+**403** `Forbidden` (`AnswerForbidden`, `errors` stay empty)
+
+```json
+{"status": 403, "data": {"@type": "forbidden", "context": {"right": "order.cancel"}}}
+```
 
 **404** `NotFound`
 

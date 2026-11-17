@@ -13,6 +13,7 @@ use JardisSupport\Response\Data\Reference;
 use JardisSupport\Response\Data\RuleResult;
 use JardisSupport\Response\Handler\Answer\AnswerCommand;
 use JardisSupport\Response\Handler\Answer\AnswerFindings;
+use JardisSupport\Response\Handler\Answer\AnswerForbidden;
 use JardisSupport\Response\Handler\Answer\AnswerNotFound;
 use JardisSupport\Response\Handler\Answer\AnswerOutcome;
 use JardisSupport\Response\Handler\Answer\AnswerRead;
@@ -45,6 +46,24 @@ class AnswerBehaviourTest extends TestCase
 
         $this->assertSame(404, $answer->getStatus());
         $this->assertSame(['@type' => 'notFound', 'context' => ['orderNumber' => 'A-1']], $answer->getData());
+    }
+
+    public function testForbiddenAnswers403WithThePayloadInDataAndNoErrors(): void
+    {
+        $answer = (new AnswerForbidden())(AnswerHarness::result('X'), AnswerHarness::transform(), ['right' => 'order.cancel']);
+
+        $this->assertSame(403, $answer->getStatus());
+        $this->assertSame(['@type' => 'forbidden', 'context' => ['right' => 'order.cancel']], $answer->getData());
+        $this->assertSame([], $answer->getErrors());
+    }
+
+    public function testForbiddenWithoutContextAnswersAnEmptyObjectAsContext(): void
+    {
+        $answer = (new AnswerForbidden())(AnswerHarness::result('X'), AnswerHarness::transform(), []);
+
+        $this->assertSame(403, $answer->getStatus());
+        $this->assertEquals(['@type' => 'forbidden', 'context' => new \stdClass()], $answer->getData());
+        $this->assertSame('forbidden', AnswerForbidden::MESSAGE_KEY);
     }
 
     public function testRuleViolationAnswers422WithRuleKeyAndContext(): void
