@@ -37,6 +37,12 @@ class DecouplingTest extends TestCase
             'messageKey(): string',
             'context(): array',
         ],
+        'Data\\Failure\\Forbidden' => [
+            '__construct(string $messageKey, array $context = …)',
+            'status(): ResponseStatus',
+            'messageKey(): string',
+            'context(): array',
+        ],
         'Data\\Failure\\NotFound' => [
             '__construct(string $messageKey, array $context = …)',
             'status(): ResponseStatus',
@@ -70,9 +76,11 @@ class DecouplingTest extends TestCase
         ],
         'Data\\ReadResult' => [
             'static ofList(array $items, int $total): self',
+            'static ofCappedList(array $items, int $counted, int $cap): self',
             'static ofOne(mixed $item): self',
             'items(): array',
             'total(): int',
+            'isCapped(): bool',
             'first(): mixed',
             'isEmpty(): bool',
         ],
@@ -120,6 +128,11 @@ class DecouplingTest extends TestCase
             'const string MESSAGE_KEY',
             '__construct(ValidationPayload $validationPayload = …, BuildResponseData $buildResponseData = …)',
             '__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings): DomainResponseInterface',
+        ],
+        'Handler\\Answer\\AnswerForbidden' => [
+            'const string MESSAGE_KEY',
+            '__construct(ForbiddenPayload $forbiddenPayload = …, BuildResponseData $buildResponseData = …)',
+            '__invoke(ContextResponseInterface $result, TransformResponse $transform, array $context): DomainResponseInterface',
         ],
         'Handler\\Answer\\AnswerInvalidRequest' => [
             'const string CONTEXT',
@@ -191,6 +204,9 @@ class DecouplingTest extends TestCase
             'const string CONFLICT_REASON',
             '__construct(BuildFailureOutcome $buildFailureOutcome = …)',
             '__invoke(Throwable $failure, bool $owner, string $aggregate): MappedFailure',
+        ],
+        'Handler\\Failure\\ForbiddenPayload' => [
+            '__invoke(string $messageKey, array $context): Forbidden',
         ],
         'Handler\\Failure\\NotFoundPayload' => [
             '__invoke(string $messageKey, array $context): NotFound',
@@ -386,7 +402,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(66, $classes);
+        $this->assertCount(69, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);

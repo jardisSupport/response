@@ -27,7 +27,7 @@ class DecodeAnswerTest extends TestCase
     private const COUNTERPART = __DIR__ . '/../../Fixture/Counterpart/';
 
     /**
-     * Row V3 "200 (five variants), 400, 404, 404 rule subject, 409, 422, 500": every case of the file in both forms.
+     * Row V3 "200 (five variants), 400, 403, 404, 404 rule subject, 409, 422, 500": every case of the file in both forms.
      *
      * @return iterable<string, array{string, string}>
      */
@@ -56,9 +56,9 @@ class DecodeAnswerTest extends TestCase
         $this->assertSame($bytes, $this->write(EnvelopeJson::envelope($response), $form));
     }
 
-    public function testTheContractHoldsTheElevenCases(): void
+    public function testTheContractHoldsTheTwelveCases(): void
     {
-        $this->assertCount(22, iterator_to_array(self::wireContractCases()));
+        $this->assertCount(24, iterator_to_array(self::wireContractCases()));
     }
 
     public function testNestedObjectsAreArraysAndOnlyAnEmptyObjectStaysAnObject(): void

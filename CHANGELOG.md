@@ -4,6 +4,16 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.4.0 — 2026-11-17
+
+### Added
+- `Data/ReadResult::ofCappedList(array $items, int $counted, int $cap): self` and `isCapped(): bool`: a list whose count stops at a cap. `counted <= cap`: `total()` is the exact `counted`, `isCapped()` false; `counted > cap`: `total()` is `cap`, `isCapped()` true. A `cap` smaller than the number of items throws `\InvalidArgumentException`. `ofList` and `ofOne` are unchanged, `isCapped()` is false there.
+- `Handler/Answer/AnswerForbidden` (`final`, `MESSAGE_KEY = 'forbidden'`): answers 403 as a value, not as an exception, in the way of `AnswerNotFound` - `data` is `{@type: forbidden, context}`, `errors` stays empty. It is not the door rejection of the delivery layer (`RequireRight`). With it `Data/Failure/Forbidden` (403 failure form), `Handler/Failure/ForbiddenPayload` and a `forbidden` branch in `BuildResponseData`. `MapThrowable` and `BuildFailureOutcome` still make no 403. The package holds 69 classes (was 66).
+- Tests: `ReadResultTest` (capped list), `AnswerBehaviourTest` (403), the case `403` in `tests/Smoke/Contract/wire-contract.json` and `WireContractTest`; the class lists `ResponseStructureTest`, `FactoryCreatableTest`, `DecouplingTest` and the case count of `DecodeAnswerTest` follow the new classes and the twelfth case.
+
+### Unchanged
+- The eleven existing cases of `wire-contract.json` (byte-identical), every existing class and signature, `composer.json` (no new dependency). Additive.
+
 ## 4.3.0 — 2026-11-13
 
 ### Added
