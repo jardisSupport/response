@@ -15,12 +15,12 @@ Status: 1.0.0 in preparation, not released.
 | Answer closures | `Handler/Answer/{AnswerFindings, AnswerForbidden, AnswerNotFound, AnswerRuleViolation, AnswerOutcome, AnswerThrowable, AnswerCommand, AnswerRead}`, `Handler/Response/{ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome}` (see below): each turns one situation of a door into the finished `DomainResponseInterface` (data into the context response, then the transformer) |
 | Request mapper | `Handler/Request/{ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings}`, `Handler/Request/Accept/{Body*, Transport*}` (15 accept closures), `Handler/Answer/AnswerInvalidRequest` (see below): reads the fields of a request that is already decoded to arrays, collects every fault and answers 400 |
 | Read the answer of another domain | `Handler/Response/DecodeAnswer` (body text and status code to `DomainResponseInterface`; see below), `Handler/Response/RequireLosslessBody` (refuses what the decoder would lose: integer beyond 64 bits, underflow to zero, key twice; fails closed), `Exception/NoJardisAnswerException` (not the answer of a Jardis domain) |
-| Read and write answers | `Data/ReadResult` (list with total, a list with a capped total (`ofCappedList`, `isCapped()`), or one optional item), `Data/Reference` (root identifier under its wire name plus child references) |
+| Read and write answers | `Data/ReadResult` (list with total, a list with a capped total (`ofCappedList`, `isCapped()`), the lazy forms `ofCountedList` and `ofCappedCountedList` that take a `Closure(): int` and count only when the total is read, or one optional item), `Data/LazyCount` (the count cell behind the lazy forms), `Data/Reference` (root identifier under its wire name plus child references) |
 | Outcome form | `Data/Response/OutcomeForm` (readonly `fields` in wire order, `rowCuts` field => row keys; names only, no wire types), used by `ProjectOutcome` (see below) |
 | Rule outcome | `Data/RuleResult` (`pass()` or `reject(rule, messageKey, context)`; answered as 422 by `AnswerRuleViolation`) |
 | Configuration error | `Exception/ConfigurationException` (unusable runtime wiring) |
 
-69 classes, every handler `final` with exactly one public entry point (`__invoke`).
+70 classes, every handler `final` with exactly one public entry point (`__invoke`).
 
 ## Door steps in order
 

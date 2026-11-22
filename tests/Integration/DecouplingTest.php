@@ -69,6 +69,10 @@ class DecouplingTest extends TestCase
             'prop array $fields',
             'prop array $errors',
         ],
+        'Data\\LazyCount' => [
+            '__construct(Closure $count)',
+            '__invoke(): int',
+        ],
         'Data\\MappedFailure' => [
             '__construct(ResponseStatus $status, FailureForm|stdClass $response)',
             'prop ResponseStatus $status',
@@ -77,6 +81,8 @@ class DecouplingTest extends TestCase
         'Data\\ReadResult' => [
             'static ofList(array $items, int $total): self',
             'static ofCappedList(array $items, int $counted, int $cap): self',
+            'static ofCountedList(array $items, Closure $count): self',
+            'static ofCappedCountedList(array $items, Closure $count, int $cap): self',
             'static ofOne(mixed $item): self',
             'items(): array',
             'total(): int',
@@ -402,7 +408,7 @@ class DecouplingTest extends TestCase
     public function testNoPublicSignatureNamesAnEngineType(): void
     {
         $classes = $this->classes();
-        $this->assertCount(69, $classes);
+        $this->assertCount(70, $classes);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
