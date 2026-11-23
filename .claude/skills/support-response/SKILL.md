@@ -120,13 +120,14 @@ try {
 
 ## Full reference
 
-All 69 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
+All 70 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
 
 | Class | Public surface |
 |---|---|
 | `Data\Response\ContextResponse` | `__construct(string $context)`; `addData(string, mixed): self`, `setData(array): self`, `getData(): array`, `addEvent(object, EventScope = Internal): self`, `getEvents(?EventScope = null): array`, `addError(string): self`, `getErrors(): array`, `addResult(ContextResponseInterface): self`, `getResults(): array` |
 | `Data\Response\DomainResponse` | `readonly`; `__construct(ResponseStatus, array $data, array $events, array $errors, array $metadata, array $eventsByScope = [])`; `isSuccess() getStatus(): int getData() getEvents(?EventScope) getErrors() getMetadata()` |
-| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
+| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; lazy sisters (from the next minor) `ofCountedList(array $items, \Closure $count)` and `ofCappedCountedList(array $items, \Closure $count, int $cap)` - `$count` is `Closure(): int`, runs at the first `total()`/`isCapped()` only, at most once (result kept; a throwing closure keeps nothing), never without a read; the `total < count(items)` check of `ofList` is made at the first read of `total()`, the `cap < count(items)` check at construction; capped: `total()` and `isCapped()` from the one count; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
+| `Data\LazyCount` | `final`; `__construct(\Closure $count)`; `__invoke(): int` - the one mutable count cell behind the lazy `ReadResult` forms (runs the closure at the first call, keeps the number); internal, built by `ReadResult` |
 | `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [], string $identifier = 'id')`; `root() children() identifier()` - answered as `{@type, <identifier>: root, <child key>: scalar\|null\|list}` |
 | `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`**; `failed(): bool` answers the same |
 | `Data\MappedFailure` | `final readonly`; `__construct(public ResponseStatus $status, public FailureForm\|\stdClass $response)` |

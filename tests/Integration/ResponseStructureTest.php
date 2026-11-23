@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 /**
- * The package holds exactly the documented 69 classes (MODELL section 5, plus the answer closures of E2-P7, `AnswerForbidden` with its `Forbidden` form and `ForbiddenPayload`, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`, `ProjectOutcome`, `OutcomeForm`, `RequireResource`, the request readers, `DecodeAnswer`, `RequireLosslessBody` and `NoJardisAnswerException`): no more, no fewer, each
+ * The package holds exactly the documented 70 classes (MODELL section 5, plus the answer closures of E2-P7, `AnswerForbidden` with its `Forbidden` form and `ForbiddenPayload`, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`, `ProjectOutcome`, `OutcomeForm`, `RequireResource`, `LazyCount` (the count cell of the lazy `ReadResult` forms), the request readers, `DecodeAnswer`, `RequireLosslessBody` and `NoJardisAnswerException`): no more, no fewer, each
  * one loadable under `JardisSupport\Response\...`.
  */
 class ResponseStructureTest extends TestCase
@@ -21,6 +21,7 @@ class ResponseStructureTest extends TestCase
         'Data\\Failure\\RuleViolation',
         'Data\\Failure\\ValidationFailure',
         'Data\\InputFindings',
+        'Data\\LazyCount',
         'Data\\MappedFailure',
         'Data\\ReadResult',
         'Data\\Reference',
@@ -97,7 +98,7 @@ class ResponseStructureTest extends TestCase
         }
         sort($found);
 
-        $this->assertCount(69, self::CLASSES);
+        $this->assertCount(70, self::CLASSES);
         $this->assertSame(self::CLASSES, $found);
         foreach (self::CLASSES as $short) {
             $class = new ReflectionClass('JardisSupport\\Response\\' . $short);
