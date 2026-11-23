@@ -4,6 +4,16 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Added
+- `Data/ReadResult::ofCountedList(array $items, \Closure $count): self` and `ofCappedCountedList(array $items, \Closure $count, int $cap): self`: the lazy sisters of `ofList` and `ofCappedList`. `$count` is a `Closure(): int`; it runs at the first `total()` (capped form: first `total()` or `isCapped()`), at most once, and its number is kept; a result that is never asked for its total never runs it. The check of `ofList` (total smaller than the number of items throws `\InvalidArgumentException`) is made at the first read of the total; the check of `ofCappedList` (cap smaller than the items) stays at construction. In the capped form `total()` and `isCapped()` come from the one count. A closure that throws keeps nothing: the next read asks again.
+- `Data/LazyCount` (`final`, `__invoke(): int`): the one mutable cell behind the lazy forms, so that `ReadResult` stays `final readonly`. The package holds 70 classes (was 69).
+- Tests: `ReadResultTest` (never called without a read, exactly once over repeated reads, total check at the first read, capped with and without exceeding the cap, throwing closure); the class lists of `ResponseStructureTest` and `DecouplingTest` follow the new class and signatures.
+
+### Unchanged
+- `ofList`, `ofCappedList`, `ofOne` and every read method of `ReadResult` (signature and behaviour), the wire contract, `composer.json` (no new dependency). Minor, additive.
+
 ## 4.4.0 — 2026-11-17
 
 ### Added

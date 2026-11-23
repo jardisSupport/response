@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JardisSupport\Response\Data;
 
+use Closure;
+
 /**
  * Typed read answer: a list of items with the total count, or a single optional item.
  *
@@ -18,6 +20,8 @@ final readonly class ReadResult
         private array $items,
         private int $total,
         private bool $capped = false,
+        private ?LazyCount $count = null,
+        private ?int $cap = null,
     ) {
     }
 
@@ -52,17 +56,44 @@ final readonly class ReadResult
      */
     public static function ofCappedList(array $items, int $counted, int $cap): self
     {
-        if ($cap < count($items)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Cap %d is smaller than the %d given items',
-                $cap,
-                count($items)
-            ));
-        }
+        self::requireCapFits($items, $cap);
 
         $capped = $counted > $cap;
 
         return new self($items, $capped ? $cap : $counted, $capped);
+    }
+
+    /**
+     * A list whose total is counted only when someone reads it: `$count` runs at the first `total()`, at
+     * most once, and its number is kept; without a read it never runs. Same check as `ofList`, made at the
+     * first read of the total.
+     *
+     * @template U
+     * @param list<U> $items
+     * @param Closure(): int $count
+     * @return self<U>
+     */
+    public static function ofCountedList(array $items, Closure $count): self
+    {
+        return new self($items, 0, false, new LazyCount($count));
+    }
+
+    /**
+     * The lazy form of `ofCappedList`: `$count` returns how many rows the count reached (it may stop at
+     * `cap + 1`); it runs at the first `total()` or `isCapped()`, at most once, both answers come from that
+     * one run. Without a read it never runs.
+     *
+     * @template U
+     * @param list<U> $items
+     * @param Closure(): int $count
+     * @return self<U>
+     * @throws \InvalidArgumentException when $cap is smaller than the number of items
+     */
+    public static function ofCappedCountedList(array $items, Closure $count, int $cap): self
+    {
+        self::requireCapFits($items, $cap);
+
+        return new self($items, 0, false, new LazyCount($count), $cap);
     }
 
     /**
@@ -88,7 +119,23 @@ final readonly class ReadResult
 
     public function total(): int
     {
-        return $this->total;
+        if ($this->count === null) {
+            return $this->total;
+        }
+
+        $counted = ($this->count)();
+        if ($this->cap !== null) {
+            return min($counted, $this->cap);
+        }
+        if ($counted < count($this->items)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Total %d is smaller than the %d given items',
+                $counted,
+                count($this->items)
+            ));
+        }
+
+        return $counted;
     }
 
     /**
@@ -96,7 +143,11 @@ final readonly class ReadResult
      */
     public function isCapped(): bool
     {
-        return $this->capped;
+        if ($this->count === null || $this->cap === null) {
+            return $this->capped;
+        }
+
+        return ($this->count)() > $this->cap;
     }
 
     /**
@@ -110,5 +161,20 @@ final readonly class ReadResult
     public function isEmpty(): bool
     {
         return $this->items === [];
+    }
+
+    /**
+     * @param list<mixed> $items
+     * @throws \InvalidArgumentException when $cap is smaller than the number of items
+     */
+    private static function requireCapFits(array $items, int $cap): void
+    {
+        if ($cap < count($items)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Cap %d is smaller than the %d given items',
+                $cap,
+                count($items)
+            ));
+        }
     }
 }
