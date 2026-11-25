@@ -4,7 +4,7 @@
 
 | Thrown | Owner (no transaction open on entry) | Not the owner |
 |---|---|---|
-| `TransientConflictException` | 409 `Conflict(CONFLICT_KEY, reason: CONFLICT_REASON, aggregate)` | thrown on - the owner repeats the unit of work |
+| `TransientConflictException` | 409 `Conflict(CONFLICT_KEY, reason: CONFLICT_REASON, aggregate)` | thrown on to the owner, who answers the 409; the package repeats nothing, the caller repeats the whole unit of work in a new transaction (no server-side retry) |
 | `ConcurrencyConflictExceptionInterface` (contracts marker) | 409 with `getReason/getAggregate/getContext/getViolated`, key `concurrencyConflict` | the same 409 |
 | `ValidationExceptionInterface` (contracts marker) | 400 `ValidationFailure` with `getFields()`, key `validation` | the same 400 |
 | any other `\Throwable` (an access denial, too: the delivery layer answers 403 before the domain runs) | 500, empty `stdClass` (cause via `LogCause`) | thrown on |
@@ -15,8 +15,8 @@
 |---|---|
 | 2xx | `@type` (process name, lcfirst) + public fields of the response; a process answer carries `@outcome` as its first field (set by `MarkOutcome` of `workflow`); a `Reference` answers `@type` + identifier ⇒ root + children |
 | 400/403/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
-| other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` |
-| 5xx | `[]` |
+| other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` (PHP array; `{}` on the wire) |
+| 5xx | `[]` (PHP array in `getData()`; an empty part is `{}` on the wire, as in the failure table of the index) |
 
 Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller's step through `jardissupport/data` `ProjectWire` (from 1.4.0).
 
