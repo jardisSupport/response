@@ -2,8 +2,6 @@
 
 Response building for Jardis request-response use cases: what a finished use case answers, in one shape. The package holds the response objects, the failure forms, the `data` of the response envelope `{status, data, errors, meta}`, the read answers and the door steps in front of a use case (input check, mapping of thrown failures, logging of the 5xx cause). It does not run a process and has no dependency on the process engine.
 
-Status: 1.0.0 in preparation, not released.
-
 ## Groups (`src/`)
 
 | Group | Content |
@@ -166,7 +164,7 @@ The reasons of a field finding are `missing`, `invalid` (validator), `type` and 
   "context": {"status": "closed"}}}
 ```
 
-The `messageKey` a node declared joins the data of a 400/404/409 last; the 422 form always carries its own.
+The `messageKey` a node declared joins the data of a 400/403/404/409 last; the 422 form always carries its own.
 
 ## Installation
 

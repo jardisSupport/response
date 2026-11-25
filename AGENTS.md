@@ -1,11 +1,11 @@
 # jardissupport/response
 
-Response building for one request-response use case: response objects (`ContextResponse`, `DomainResponse`), failure forms (400 `ValidationFailure`, 404 `NotFound`, 409 `Conflict`, 422 `RuleViolation`), the `data` of the response envelope `{status, data, errors, meta}`, read answers and write answers (`ReadResult`, `Reference`), and reading the answer of another Jardis domain back into a response (`DecodeAnswer`). The door steps (input validation, failure mapping, cause logging) and the answer closures (`Answer*`) are part of the package. Details: `README.md`, https://docs.jardis.io/en/support/response
+Response building for one request-response use case: response objects (`ContextResponse`, `DomainResponse`), failure forms (400 `ValidationFailure`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict`, 422 `RuleViolation`), the `data` of the response envelope `{status, data, errors, meta}`, read answers and write answers (`ReadResult`, `Reference`), and reading the answer of another Jardis domain back into a response (`DecodeAnswer`). The door steps (input validation, failure mapping, cause logging) and the answer closures (`Answer*`) are part of the package. Details: `README.md`, https://docs.jardis.io/en/support/response
 
 ## Layout (`src/`)
 
-- `Data/` — `ReadResult`, `LazyCount` (the one mutable count cell behind the lazy `ReadResult` forms), `Reference`, `RuleResult`, `InputFindings`, `MappedFailure`, `Failure/*` (the four failure forms behind `FailureForm`), `Response/*` (`ContextResponse`, `DomainResponse`)
-- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Door/` (`ValidateInput`, `RequireResource`), `Answer/` (`AnswerFindings`, `AnswerNotFound`, `AnswerRuleViolation`, `AnswerOutcome`, `AnswerThrowable`, `AnswerCommand`, `AnswerRead`, `AnswerInvalidRequest`), `Request/` (request mapper: `ReadRequired`, `ReadBodyNullable`, `ReadTransportOptional`, `ReadTransportList`, `FindUnknownKeys`, `RebaseFindings`, `BuildRequestFindings`, `Accept/*`), `Failure/` (payload builders, `BuildFailureForm`, `BuildFailureOutcome`, `DescribeFieldFinding`, `MapThrowable`, `LogCause`, `LogFailure`), `Response/` (`BuildResponseData`, `DecodeAnswer`, `RequireLosslessBody` (fails closed: no regex, a scan that cannot finish refuses the body), `TransformResponse`, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`)
+- `Data/` — `ReadResult`, `LazyCount` (the one mutable count cell behind the lazy `ReadResult` forms), `Reference`, `RuleResult`, `InputFindings`, `MappedFailure`, `Failure/*` (the five failure forms behind `FailureForm`), `Response/*` (`ContextResponse`, `DomainResponse`)
+- `Handler/` — one closure class per concern with exactly one public entry point (`__invoke`): `Door/` (`ValidateInput`, `RequireResource`), `Answer/` (`AnswerFindings`, `AnswerForbidden`, `AnswerNotFound`, `AnswerRuleViolation`, `AnswerOutcome`, `AnswerThrowable`, `AnswerCommand`, `AnswerRead`, `AnswerInvalidRequest`), `Request/` (request mapper: `ReadRequired`, `ReadBodyNullable`, `ReadTransportOptional`, `ReadTransportList`, `FindUnknownKeys`, `RebaseFindings`, `BuildRequestFindings`, `Accept/*`), `Failure/` (payload builders, `BuildFailureForm`, `BuildFailureOutcome`, `DescribeFieldFinding`, `MapThrowable`, `LogCause`, `LogFailure`), `Response/` (`BuildResponseData`, `DecodeAnswer`, `RequireLosslessBody` (fails closed: no regex, a scan that cannot finish refuses the body), `TransformResponse`, `ProjectAnswer`, `ProjectRows`, `ReshapeAnswer`, `ProjectAnswerRows`)
 - `Exception/` — `ConfigurationException`, `NoJardisAnswerException` (both `final`, extend `\RuntimeException`)
 
 ## Commands (always `make`)
@@ -15,7 +15,7 @@ Response building for one request-response use case: response objects (`ContextR
 ## Rules
 
 - Closure-Orchestrator: atomic closure classes (one public `__invoke`), no logic in composing classes
-- Everything is `final`; constructor injection, no static state; the clock is an injected PSR-20 `ClockInterface`
+- Everything is `final` except the two response objects `ContextResponse` and `DomainResponse`; constructor injection, no static state; the clock is an injected PSR-20 `ClockInterface`
 - Arrow rule: nothing in `src/` or `tests/` imports the process engine namespace (`workflow`); the engine side in tests is a stand-in
 - Tests are integration tests; mock ports only, no assertion weakening
 - The wire contract `tests/Smoke/Contract/wire-contract.json` is the one `tests/` path that ships; changing it is a breaking change of the wire (major version) and needs a decision
