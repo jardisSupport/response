@@ -8,6 +8,9 @@ prerequisites: [foundation-architecture, support-contracts]
 next: [support-workflow, generated-code-workflow-api]
 ---
 
+This skill is an index; the detail lives in `reference/`, one leaf per topic. Read exactly the leaf whose question matches your task, not all of them.
+The triggers, the door in four steps, the failure forms, the pitfalls and the layer rules stay in this index.
+
 ## Triggers
 
 jardissupport/response 4.5 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/403/404/409/422 (ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker), reading the answer of another Jardis domain (DecodeAnswer, NoJardisAnswerException), the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, DecodeAnswer, the answer of another Jardis domain, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/403/404/409/422 door answers.
@@ -51,21 +54,6 @@ $result->setData($data);
 $domainResponse = (new TransformResponse($clock, $version))($result, $status);              // {status, data, errors, meta}
 ```
 
-The same door with the answer closures (`Handler\Answer\*`) - calls and branches on what a call returns, nothing else:
-
-```php
-$findings = ($this->handle(ValidateInput::class, validator: $validator))($input);
-if ($findings->failed()) { return ($this->handle(AnswerFindings::class))($this->result(), $this->transformer(), $findings); }   // 400
-try {
-    // ... run in the transaction bracket -> $outcome (AnswerableOutcomeInterface), $owner
-    return ($this->handle(AnswerOutcome::class))($this->result(), $this->transformer(), $outcome, $processName);   // events, errors, data, status
-} catch (\Throwable $e) {
-    $answer = ($this->handle(AnswerThrowable::class))($this->result(), $this->transformer(), $e, $owner, $processName);   // maps, logs nothing
-    ($this->handle(LogFailure::class, logger: $logger))($e, $processName, $owner, $answer);                            // owner + 5xx only
-    return $answer;
-}
-```
-
 | Failure status | Form (`Data/Failure/`) | `data` on the wire |
 |---|---|---|
 | 400 | `ValidationFailure(messageKey, fields[], context)` | `{@type: validation, fields}` |
@@ -75,136 +63,17 @@ try {
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
 | 500 | none (`stdClass`) | `{}` |
 
-The wire contract `tests/Smoke/Contract/wire-contract.json` (12 cases, every 2xx case carries `@outcome` behind `@type`: 200, 200-empty, 200-merged, 200-answer-class, 200-datetime-offset (carrier: process `VoucherOverview`, `vouchers[].createdAt`), 400, 403, 404, 409, 422, 404-rule-subject, 500) ships with the package; the package test drives only the door steps, the proof with a generated handler is the consumer's.
+## Navigation
 
-## Outcome projection (`@outcome`, from 4.2.0)
+Navigation: one leaf per topic under `reference/`. Pick the row whose question fits the task; the table of the failure forms above, the pitfalls and the layer rules stay in this index.
 
-A process that ends in one of several outcomes marks its 2xx answer with `@outcome` (written by `MarkOutcome` of `workflow`; this package only reads the literal `ProjectOutcome::KEY`). The outer door cuts the answer to the form of the outcome that ran:
-
-```php
-$outer = ($this->handle(ProjectOutcome::class))($inner, [
-    'released' => new OutcomeForm(['orderNumbers', 'invoiceNumber']),
-    'deferred' => new OutcomeForm(['reason']),
-]);
-```
-
-Missing `@outcome` or an outcome without a form is a wiring fault (`ConfigurationException`, the door answers 500 through `MapThrowable`); non-2xx passes unchanged. Additive minor: `ProjectAnswer` is unchanged.
-
-## Request mapper (array-shaped input, 400 with all faults)
-
-For a transport that hands the door plain arrays (path/query values, decoded JSON body) - no PSR-7, no router. One reader per field collects `{field, reason}` findings (`missing`, `type`, `unknown`); the door answers once with all of them.
-
-```php
-$fields = [];
-$name = (new ReadRequired())($body, 'name', new BodyStr(), '', $fields);              // absent = missing, refused = type, fallback stands in
-$due  = (new ReadBodyNullable())($body, 'due', new BodyDate($validator), $fields);    // absent/null = null
-$qty  = (new ReadTransportOptional())($query, 'qty', new TransportInt(), $fields);    // absent/''/null = null
-(new FindUnknownKeys())($body, ['name', 'due'], $fields);                             // unknown keys, body order
-if ($fields !== []) { return (new AnswerInvalidRequest($clock))($fields, $version); } // 400, meta.version
-```
-
-**Constructor dependencies (ports, no new runtime dependency):** the six calendar accept closures (`TransportDate|DateTime|Time`, `BodyDate|DateTime|Time`) take a `ValueValidatorInterface` (pass the `DateTime` validator of `jardissupport/validation`); `AnswerInvalidRequest` takes a PSR-20 `ClockInterface`. Both are required, so `Factory::get()` cannot create them without a registered instance; readers and the other accept closures are creatable without arguments. Not in this package (stay in `jardiscore/app`): `ParseJsonBody`, `CreateServerRequest`, `ResolveVersion`.
-
-## Reading the answer of another domain (from 4.3.0)
-
-Hand-written code that called another Jardis domain over HTTP turns the reply back into a `DomainResponseInterface` with `DecodeAnswer` - body text and status code in, no PSR-7 type, no constructor. It is the one class of the package (with `NoJardisAnswerException`) that domain code may import.
-
-```php
-try {
-    $answer = (new DecodeAnswer())((string) $reply->getBody(), $reply->getStatusCode());   // 200..500 of the envelope, 204 without body
-} catch (NoJardisAnswerException $e) {
-    // not JSON / key missing / HTTP status != envelope status / status outside ResponseStatus (502, 302): a transport failure, not an answer
-}
-```
-
-401, 403 and 405 come from the delivery layer of the other domain in the same envelope; their `errors` (texts and objects there) are normalised to a list of texts per key, so those bytes are not written back identically. Events are not in the envelope: the response carries none.
-
-## Full reference
-
-All 70 classes, namespace `JardisSupport\Response\`, every handler `final` with exactly one public entry point.
-
-| Class | Public surface |
-|---|---|
-| `Data\Response\ContextResponse` | `__construct(string $context)`; `addData(string, mixed): self`, `setData(array): self`, `getData(): array`, `addEvent(object, EventScope = Internal): self`, `getEvents(?EventScope = null): array`, `addError(string): self`, `getErrors(): array`, `addResult(ContextResponseInterface): self`, `getResults(): array` |
-| `Data\Response\DomainResponse` | `readonly`; `__construct(ResponseStatus, array $data, array $events, array $errors, array $metadata, array $eventsByScope = [])`; `isSuccess() getStatus(): int getData() getEvents(?EventScope) getErrors() getMetadata()` |
-| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; lazy sisters (from 4.5.0) `ofCountedList(array $items, \Closure $count)` and `ofCappedCountedList(array $items, \Closure $count, int $cap)` - `$count` is `Closure(): int`, runs at the first `total()`/`isCapped()` only, at most once (result kept; a throwing closure keeps nothing), never without a read; the `total < count(items)` check of `ofList` is made at the first read of `total()`, the `cap < count(items)` check at construction; capped: `total()` and `isCapped()` from the one count; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
-| `Data\LazyCount` | `final`; `__construct(\Closure $count)`; `__invoke(): int` - the one mutable count cell behind the lazy `ReadResult` forms (runs the closure at the first call, keeps the number); internal, built by `ReadResult` |
-| `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [], string $identifier = 'id')`; `root() children() identifier()` - answered as `{@type, <identifier>: root, <child key>: scalar\|null\|list}` |
-| `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`**; `failed(): bool` answers the same |
-| `Data\MappedFailure` | `final readonly`; `__construct(public ResponseStatus $status, public FailureForm\|\stdClass $response)` |
-| `Data\Failure\FailureForm` | interface: `status(): ResponseStatus`, `messageKey(): string`, `context(): array` |
-| `Data\Failure\ValidationFailure` | `__construct(string $messageKey, array $fields, array $context = [])`; `fields()` |
-| `Data\Failure\Forbidden` | `__construct(string $messageKey, array $context = [])` (403; answered by `AnswerForbidden`) |
-| `Data\Failure\NotFound` | `__construct(string $messageKey, array $context = [])` |
-| `Data\Failure\Conflict` | `__construct(string $messageKey, array $context = [], ?string $reason = null, ?string $aggregate = null, array $violated = [])`; `reason() aggregate() violated()` |
-| `Data\Failure\RuleViolation` | `__construct(string $rule, string $messageKey, array $context = [])`; `rule()` |
-| `Exception\ConfigurationException` | `final`, extends `\RuntimeException` - unusable runtime wiring (generated `requires` lines) |
-| `Handler\Failure\ValidationPayload` | `__invoke(string $messageKey, array $fields, array $context = []): ValidationFailure` |
-| `Handler\Failure\ForbiddenPayload` | `__invoke(string $messageKey, array $context): Forbidden` |
-| `Handler\Failure\NotFoundPayload` | `__invoke(string $messageKey, array $context): NotFound` |
-| `Handler\Failure\ConcurrencyConflictPayload` | `__invoke(string $messageKey, string $reason, string $aggregate, array $context, array $violated): Conflict` |
-| `Handler\Failure\RuleViolationPayload` | `__invoke(string $rule, string $messageKey, array $context): RuleViolation` |
-| `Handler\Failure\BuildFailureForm` | `__construct(ValidationPayload = new, NotFoundPayload = new, ConcurrencyConflictPayload = new, RuleViolationPayload = new)`; `__invoke(ResponseStatus, string $messageKey, array $context, array $errors): ?FailureForm` - built from the context keys `fields`, `reason/aggregate/violated`, `rule`; 404 takes the whole context; other statuses `null` |
-| `Handler\Failure\DescribeFieldFinding` | `public const string KEY_PREFIX, REASON_MISSING, REASON_INVALID, REASON_TYPE, REASON_UNKNOWN, TEXT_MISSING, TEXT_INVALID, TEXT_TYPE, TEXT_UNKNOWN`; `__invoke(array $finding): array` - adds `messageKey` `validation.<reason>` for `missing`/`invalid`/`type`/`unknown` (any other reason: `validation.invalid`) and the standard text of the reason when the caller delivered none |
-| `Handler\Failure\BuildFailureOutcome` | `__construct(BuildFailureForm = new)`; `__invoke(ResponseStatus, string $messageKey, array $context = [], array $errors = [], bool $declared = false): FailureForm\|\stdClass` - form of the status; 5xx `stdClass{}`; 4xx without form: `declared` -> `(object) $context`, else `{messageKey, context}` |
-| `Handler\Failure\LogCause` | `__construct(?LoggerInterface $logger)`; `__invoke(\Throwable $cause, string $process): void` - `error` log with `exception` and `process`; no logger = nothing; a cause carrying the marker `ReportedFailureExceptionInterface` (already reported where it arose, e.g. `CalleeFailureException` from workflow) is skipped; a failing logger is swallowed |
-| `Handler\Failure\MapThrowable` | `public const string CONFLICT_KEY = 'process.transientConflict'`, `CONFLICT_REASON = 'stale_write'`; `__construct(BuildFailureOutcome = new)`; `__invoke(\Throwable $failure, bool $owner, string $aggregate): MappedFailure` |
-| `Handler\Response\BuildResponseData` | `__invoke(ResponseStatus $status, object $response, ?string $declaredMessageKey, string $processName): array` - the `data` of the envelope, **without** wire projection |
-| `Handler\Response\TransformResponse` | `final`; `__construct(ClockInterface $clock, string $version = '')`; `__invoke(ContextResponseInterface $result, ?ResponseStatus $status = null): DomainResponseInterface`; time only from the injected PSR-20 clock |
-| `Handler\Door\ValidateInput` | `public const string MESSAGE_KEY = 'process.inputInvalid'`; `__construct(ValidatorInterface $validator, DescribeFieldFinding = new)`; `__invoke(object $input): InputFindings`; field paths below the input root (`customer`, `items[1].qty`), root name `lcfirst(shortName)` |
-| `Data\RuleResult` | `final readonly`; `pass()`, `reject(string $rule, string $messageKey, array $context = [])`; public `passed rule messageKey context` |
-| `Handler\Failure\LogFailure` | `__construct(?LoggerInterface $logger = null, ?LogCause = null)`; `__invoke(\Throwable $cause, string $process, bool $owner, DomainResponseInterface $answer): void` - logs (`LogCause`) only when `$owner` and the answer is a 5xx |
-| `Handler\Response\DecodeAnswer` | `final`, optional constructor argument `RequireLosslessBody` (`new DecodeAnswer()` is enough); `__invoke(string $body, int $status): DomainResponseInterface` - reads the answer of another Jardis domain (body text and status code, no HTTP type; the caller hands in what its client returned): 204 without body = empty answer, status 204; every other status needs a JSON object with `status`, `data`, `errors`, `meta` (the last three objects) and `status` of the envelope = `$status`; `$status` must be a `ResponseStatus`; `data`/`meta` as arrays (nested objects too, only an empty object stays `stdClass`, so it is written as `{}` again), `errors` as list of texts per key (text -> one entry, number/object -> its JSON text), no events; one shape rule at every depth (a non-empty object with the keys `0`,`1`,... without a gap, and a key with a leading NUL byte, are refused on top and nested; real lists, `[]`, `{}`, objects with a name/gap/other order stay as they were); an integer beyond 64 bits, a number with a non-zero mantissa that underflows to zero (`1e-400`) and a key twice in one object, anywhere in the body, are refused (the decoder would make a float / `0.0` / keep the last value); `PHP_INT_MAX`/`PHP_INT_MIN`, floats in the text, zero in any spelling, `5e-324`, numbers rounded in their last digits and `"a"`/`"A"` stay; round trip with the envelope encoder is byte-identical for the cases of `wire-contract.json`, **except 401 and 403** (the delivery layer writes `errors` there as texts and objects); anything else -> `NoJardisAnswerException` (transport failure for the caller); the only class besides its exception that domain code may import |
-| `Exception\NoJardisAnswerException` | `final`, extends `\RuntimeException` - body and status are not the answer of a Jardis domain: no JSON, a key of the envelope missing, HTTP status differs from the `status` of the envelope, status outside `ResponseStatus` (502, 302), a 204 with a body, a number without a JSON form (`1e999`, `-1e999`) at any depth of `data`/`meta`/`errors`, a key of `errors` that is a number, `data`/`meta` with the keys `0`, `1`, ... of a list; `getPrevious()` is the `\JsonException` for unreadable JSON |
-| `Handler\Response\ProjectAnswer` | `final`; `__construct(ReshapeAnswer = new)`; `__invoke(DomainResponseInterface $response, string ...$fields): DomainResponseInterface` - outer-door cut: 2xx keeps `@type` + the named fields that exist in `data` (order as in data, missing not added, unknown no error), status/errors/metadata/events of every scope unchanged; non-2xx = the same instance; knows no field name of its own |
-| `Handler\Response\ProjectRows` | `final`; `__invoke(array $rows, string ...$fields): array` (`list<array<string,mixed>>`) - row cut of a list: each row keeps exactly the named keys in `$fields` order, nothing added, `null` stays; **unlike `ProjectAnswer` a missing key is drift**: `\UnexpectedValueException` with row index and field (also `$rows` no list, row no array) -> `MapThrowable` 500; empty `$fields` -> `\InvalidArgumentException`; knows no field name of its own |
-| `Handler\Response\RequireLosslessBody` | `final`, no constructor; `__invoke(string $body): void` - run by `DecodeAnswer` on a body that is valid JSON: refuses what `json_decode` would lose without a trace, anywhere in the body - an integer beyond 64 bits (would become a float), a non-zero number that underflows to `0.0` and a key twice in one object (last value wins); reads the token stream with a linear `strspn`/`strcspn` walk, no regex (a string value is one token, never looked into), keys compared after escapes, by bytes; a scan that cannot reach the end of the body refuses it (fail closed); throws `NoJardisAnswerException`; internal step, domain code imports `DecodeAnswer` only |
-| `Handler\Response\ReshapeAnswer` | `final`; `__invoke(DomainResponseInterface $response, \Closure $step): DomainResponseInterface` - 2xx: new `DomainResponse` with `$step(data)`, status/errors/metadata/events of every scope carried over; non-2xx = the same instance, step not called; knows no field name; `ProjectAnswer` is built on it |
-| `Handler\Response\ProjectAnswerRows` | `final`; `__construct(ReshapeAnswer = new, ProjectRows = new)`; `__invoke(DomainResponseInterface $response, array $cuts): DomainResponseInterface` - `$cuts` field => row keys; each field cut with `ProjectRows` (missing row key -> `\UnexpectedValueException`); missing or `null` field skipped without error; non-2xx = the same instance |
-| `Handler\Response\ProjectOutcome` | `final`; `public const string KEY = '@outcome'` (same literal as `MarkOutcome::KEY` of `workflow`); `__construct(ReshapeAnswer = new, ProjectAnswerRows = new)`; `__invoke(DomainResponseInterface $response, array $forms): DomainResponseInterface` - `$forms` outcome name => `OutcomeForm`; 2xx keeps `@type`, `@outcome` and exactly the fields of the form that ran (form order, field of another form gone, missing field not added) and cuts list rows by the form's `rowCuts`; non-2xx = the same instance; 2xx without `@outcome` or with an outcome without a form -> `ConfigurationException`; knows no outcome or field name of its own |
-| `Data\Response\OutcomeForm` | `final readonly`; `__construct(array $fields, array $rowCuts = [])`; `fields` list of field names in wire order, `rowCuts` field => row keys; names only, no wire types (the projection of values stays `ProjectWire` of the data package) |
-| `Handler\Door\RequireResource` | `final`; `__invoke(?object $resource, string $name): object` - `null` -> `ConfigurationException('Required resource "<name>" is not provided by the kernel')`, else the same object |
-| `Handler\Answer\AnswerFindings` | `__invoke(ContextResponseInterface $result, TransformResponse $transform, InputFindings $findings)` -> 400 `{@type: validation, fields}`, every validator text added as error |
-| `Handler\Answer\AnswerNotFound` | `__invoke($result, $transform, array $context)` -> 404 `{@type: notFound, context}` |
-| `Handler\Answer\AnswerForbidden` | `final`, `MESSAGE_KEY = 'forbidden'`; `__invoke($result, $transform, array $context)` -> 403 `{@type: forbidden, context}`, `errors` empty - an answer, not an exception, and not the door rejection of `RequireRight` |
-| `Handler\Answer\AnswerRuleViolation` | `__invoke($result, $transform, RuleResult $rejection)` -> 422 `{@type: ruleViolation, rule, messageKey, context}` |
-| `Handler\Answer\AnswerOutcome` | `__invoke($result, $transform, AnswerableOutcomeInterface $outcome, string $processName)` - Domain events and errors into the result, then response (success) or failure form of the reject, under the outcome's status; no engine type |
-| `Handler\Answer\AnswerThrowable` | `__invoke($result, $transform, \Throwable $failure, bool $owner, string $aggregate)` - `MapThrowable` + `BuildResponseData`; throws on what is not the owner's to answer; logs nothing |
-| `Handler\Answer\AnswerCommand` | `__invoke($result, $transform, Reference $reference, string $aggregate)` - `{@type, <identifier>: root, <children>}`, status from collected errors |
-| `Handler\Answer\AnswerRead` | `__invoke($result, $transform, ReadResult $found, string $type)` - `@type` plus public fields of the first item, `[]` when empty |
-| `Handler\Request\ReadRequired` | `__invoke(array $source, string $name, callable $accept, mixed $fallback, array &$fields): mixed` - absent = `missing`; `null` goes to the accept closure; refused = `type`; findings collected, fallback returned |
-| `Handler\Request\ReadBodyNullable` | `__invoke(array $body, string $name, callable $accept, array &$fields): mixed` - absent or `null` = `null`; refused = `type` + `null` |
-| `Handler\Request\ReadTransportOptional` | `__invoke(array $source, string $name, callable $accept, array &$fields): mixed` - absent, `''`, `null` = `null`; refused = `type` + `null` |
-| `Handler\Request\ReadTransportList` | `__invoke(array $source, string $name, callable $accept, array &$fields): array` - repeated query parameter; absent/empty = `missing`; one refused element = one `type`, list `[]` |
-| `Handler\Request\FindUnknownKeys` | `__invoke(array $source, array $known, array &$fields): void` - every key not in `$known` = `unknown`, body order |
-| `Handler\Request\RebaseFindings` | `__invoke(string $path, array $found, array &$fields): void` - `<path>.<field>` onto the carrying path |
-| `Handler\Request\BuildRequestFindings` | `public const string REASON_MISSING, REASON_TYPE, REASON_UNKNOWN`; `__construct(DescribeFieldFinding = new)`; `__invoke(array $fields): InputFindings` |
-| `Handler\Request\Accept\Transport{Str,Int,Float,Bool}` | `__invoke(mixed): ?T` - a path/query value is a string, validated first, coerced second (`Bool`: exactly `true false 1 0`) |
-| `Handler\Request\Accept\TransportDecimal` | `public const string LEXICAL_PATTERN`; `__construct(string $pattern = LEXICAL_PATTERN)`; `__invoke(mixed): ?string` - stays a string |
-| `Handler\Request\Accept\Transport{Date,DateTime,Time}` | `__construct(ValueValidatorInterface $validator)`; `__invoke(mixed): ?string` - `Y-m-d` / RFC 3339 with offset / `H:i:s`, judged by the validator, string handed on |
-| `Handler\Request\Accept\Body{Str,Int,Float,Bool}` | `__invoke(mixed): ?T` - a JSON value keeps its type (`Int` only a JSON integer, `Float` int or float) |
-| `Handler\Request\Accept\Body{Date,DateTime,Time}` | `__construct(ValueValidatorInterface $validator)`; `__invoke(mixed): ?DateTimeImmutable` - `BodyDateTime` normalised to UTC |
-| `Handler\Answer\AnswerInvalidRequest` | `public const string CONTEXT = 'validation'`; `__construct(ClockInterface $clock, BuildRequestFindings = new, AnswerFindings = new)`; `__invoke(array $fields, string $version = ''): DomainResponseInterface` - the 400 with all findings, `meta.version` |
-
-**MapThrowable table** (every 4xx is answered, only the owner answers a 5xx):
-
-| Thrown | Owner (no transaction open on entry) | Not the owner |
-|---|---|---|
-| `TransientConflictException` | 409 `Conflict(CONFLICT_KEY, reason: CONFLICT_REASON, aggregate)` | thrown on - the owner repeats the unit of work |
-| `ConcurrencyConflictExceptionInterface` (contracts marker) | 409 with `getReason/getAggregate/getContext/getViolated`, key `concurrencyConflict` | the same 409 |
-| `ValidationExceptionInterface` (contracts marker) | 400 `ValidationFailure` with `getFields()`, key `validation` | the same 400 |
-| any other `\Throwable` (an access denial, too: the delivery layer answers 403 before the domain runs) | 500, empty `stdClass` (cause via `LogCause`) | thrown on |
-
-**BuildResponseData per answer:**
-
-| Answer | `data` |
-|---|---|
-| 2xx | `@type` (process name, lcfirst) + public fields of the response; a process answer carries `@outcome` as its first field (set by `MarkOutcome` of `workflow`); a `Reference` answers `@type` + identifier ⇒ root + children |
-| 400/403/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
-| other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` |
-| 5xx | `[]` |
-
-Dates stay as they are: the projection to the wire (RFC 3339, UTC) is the caller's step through `jardissupport/data` `ProjectWire` (from 1.4.0).
+| Question the leaf answers | Leaf |
+| --- | --- |
+| How do I write the door with the answer closures (AnswerFindings, AnswerOutcome, AnswerThrowable, LogFailure), what does the wire contract fix, and how does ProjectOutcome cut an `@outcome` answer? | reference/door-and-outcome.md |
+| How do I map array-shaped input (path/query values, decoded JSON body) to one 400 with all faults - ReadRequired, accept closures, FindUnknownKeys, AnswerInvalidRequest? | reference/request-mapper.md |
+| How do I turn the reply of another Jardis domain back into a DomainResponseInterface - DecodeAnswer, NoJardisAnswerException? | reference/decode-foreign-answer.md |
+| What is the exact public surface (constructor, `__invoke`, constants) of one of the 70 classes? | reference/class-reference.md |
+| Which status does MapThrowable give for which thrown failure, and what does BuildResponseData put into `data` per answer? | reference/mapping-tables.md |
 
 ## Pitfalls
 
