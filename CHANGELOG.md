@@ -4,6 +4,13 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
+## 4.5.2 — 2026-11-25
+
+### Changed
+- Docs only, `src/`, `tests/` and `composer.json` unchanged.
+- Component skill split into an index (`SKILL.md`, 10 KB instead of 32 KB) plus five flat `reference/` leaves behind a navigation table; content is unchanged. After a context compaction an assistant keeps only the first 5,000 tokens of a skill, so the tail of the former single file was lost.
+- Mapping tables state that an empty `data` part is `[]` in PHP and `{}` on the wire, and that after a `TransientConflictException` the caller repeats the unit of work, not the package.
+
 ## 4.5.1 — 2026-11-25
 
 ### Changed
