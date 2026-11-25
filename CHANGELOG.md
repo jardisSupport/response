@@ -4,7 +4,14 @@ All notable changes to `jardissupport/response` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-## Unreleased
+## 4.5.1 — 2026-11-25
+
+### Changed
+- Docs only, `src/`, `tests/` and `composer.json` unchanged.
+- Component skill: version line, description and triggers state 4.5 and the failure forms 400/403/404/409/422; the failure table gains the 403 `Forbidden` row; the lazy `ReadResult` forms are marked as released with 4.5.0; the door example no longer says that no 403 is made at all (`AnswerForbidden` answers it as a value).
+- `AGENTS.md`: five failure forms, `AnswerForbidden` in the layout, `final` rule names the two response objects that are not final. `README.md`: stale "in preparation" status line dropped, the declared `messageKey` joins a 403 too.
+
+## 4.5.0 — 2026-11-23
 
 ### Added
 - `Data/ReadResult::ofCountedList(array $items, \Closure $count): self` and `ofCappedCountedList(array $items, \Closure $count, int $cap): self`: the lazy sisters of `ofList` and `ofCappedList`. `$count` is a `Closure(): int`; it runs at the first `total()` (capped form: first `total()` or `isCapped()`), at most once, and its number is kept; a result that is never asked for its total never runs it. The check of `ofList` (total smaller than the number of items throws `\InvalidArgumentException`) is made at the first read of the total; the check of `ofCappedList` (cap smaller than the items) stays at construction. In the capped form `total()` and `isCapped()` come from the one count. A closure that throws keeps nothing: the next read asks again.
