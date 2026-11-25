@@ -1,6 +1,6 @@
 ---
 name: support-response
-description: "jardissupport/response 4.3 - one shape for the answer of a request-response use case: Response objects, failure forms 400/404/409/422, envelope data, read answers, door steps, request mapper, reading the answer of another Jardis domain. Use when working with ValidateInput, MapThrowable, AnswerInvalidRequest, BuildResponseData, DecodeAnswer."
+description: "jardissupport/response 4.5 - one shape for the answer of a request-response use case: Response objects, failure forms 400/403/404/409/422, envelope data, read answers, door steps, request mapper, reading the answer of another Jardis domain. Use when working with ValidateInput, MapThrowable, AnswerInvalidRequest, BuildResponseData, DecodeAnswer."
 user-invocable: false
 zone: post-active
 persona: C
@@ -10,14 +10,14 @@ next: [support-workflow, generated-code-workflow-api]
 
 ## Triggers
 
-jardissupport/response 4.3 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/404/409/422 (ValidationFailure, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker), reading the answer of another Jardis domain (DecodeAnswer, NoJardisAnswerException), the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, DecodeAnswer, the answer of another Jardis domain, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/404/409/422 door answers.
+jardissupport/response 4.5 - the answer of one request-response use case in one shape. Response objects (ContextResponse, DomainResponse, TransformResponse), failure forms 400/403/404/409/422 (ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation, BuildFailureForm, BuildFailureOutcome), the data of the envelope {status, data, errors, meta} (BuildResponseData), read answers (ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, the `@outcome` marker), reading the answer of another Jardis domain (DecodeAnswer, NoJardisAnswerException), the door steps in front of a use case (ValidateInput, RequireResource, MapThrowable, LogCause) and the request mapper for array-shaped input (ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, AnswerInvalidRequest). No process engine inside. Use when working with jardissupport/response, DecodeAnswer, the answer of another Jardis domain, request mapper, Accept closures, AnswerInvalidRequest, failure forms, BuildResponseData, MapThrowable, ValidateInput, InputFindings, MappedFailure, the response envelope, wire contract or 400/403/404/409/422 door answers.
 
 # RESPONSE_COMPONENT_SKILL
-> `jardissupport/response` 4.3.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
+> `jardissupport/response` 4.5.0 | NS: `JardisSupport\Response` | PHP 8.3+ | requires `jardissupport/contracts` ^2.16, `psr/log` ^3.0, `psr/clock` ^1.0 | never `workflow` (arrow rule M5)
 
 ## Usage essentials
 
-**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, @outcome, DecodeAnswer, NoJardisAnswerException, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
+**Trigger:** jardissupport/response, ContextResponse, DomainResponse, TransformResponse, ValidationFailure, Forbidden, NotFound, Conflict, RuleViolation, FailureForm, BuildFailureForm, BuildFailureOutcome, BuildResponseData, AnswerForbidden, ValidateInput, MapThrowable, LogCause, InputFindings, MappedFailure, ReadResult, Reference, ProjectAnswer, ProjectRows, ReshapeAnswer, ProjectAnswerRows, ProjectOutcome, OutcomeForm, @outcome, DecodeAnswer, NoJardisAnswerException, RequireResource, AnswerInvalidRequest, ReadRequired, ReadBodyNullable, ReadTransportOptional, ReadTransportList, FindUnknownKeys, RebaseFindings, BuildRequestFindings, Accept closures, ConfigurationException, response envelope, wire contract.
 
 The package answers one question: what does a finished use case say to its caller, in one shape. It holds objects and single-step closures; it does **not** run a process, route nodes or open transactions. The door of a use case (generated handler) composes the steps in a fixed order:
 
@@ -36,7 +36,7 @@ if ($findings->fields !== []) {
         ['fields' => $findings->fields], $findings->errors);            // ValidationFailure
 }
 
-// 401 and 403 are not made here: the delivery layer answers them (RequireSession, RequireRight)
+// 401 is not made here: the delivery layer answers it (RequireSession), as it does the door rejection 403 (RequireRight); a 403 as a value is AnswerForbidden
 
 // ③ a thrown failure
 try { /* the use case */ } catch (\Throwable $failure) {
@@ -69,6 +69,7 @@ try {
 | Failure status | Form (`Data/Failure/`) | `data` on the wire |
 |---|---|---|
 | 400 | `ValidationFailure(messageKey, fields[], context)` | `{@type: validation, fields}` |
+| 403 | `Forbidden(messageKey, context)` (answered by `AnswerForbidden`) | `{@type: forbidden, context}` |
 | 404 | `NotFound(messageKey, context)` | `{@type: notFound, context}` |
 | 409 | `Conflict(messageKey, context, reason, aggregate, violated)` | `{@type: concurrencyConflict, reason, aggregate, context, violated}` |
 | 422 | `RuleViolation(rule, messageKey, context)` | `{@type: ruleViolation, rule, messageKey, context}` |
@@ -126,7 +127,7 @@ All 70 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 |---|---|
 | `Data\Response\ContextResponse` | `__construct(string $context)`; `addData(string, mixed): self`, `setData(array): self`, `getData(): array`, `addEvent(object, EventScope = Internal): self`, `getEvents(?EventScope = null): array`, `addError(string): self`, `getErrors(): array`, `addResult(ContextResponseInterface): self`, `getResults(): array` |
 | `Data\Response\DomainResponse` | `readonly`; `__construct(ResponseStatus, array $data, array $events, array $errors, array $metadata, array $eventsByScope = [])`; `isSuccess() getStatus(): int getData() getEvents(?EventScope) getErrors() getMetadata()` |
-| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; lazy sisters (from the next minor) `ofCountedList(array $items, \Closure $count)` and `ofCappedCountedList(array $items, \Closure $count, int $cap)` - `$count` is `Closure(): int`, runs at the first `total()`/`isCapped()` only, at most once (result kept; a throwing closure keeps nothing), never without a read; the `total < count(items)` check of `ofList` is made at the first read of `total()`, the `cap < count(items)` check at construction; capped: `total()` and `isCapped()` from the one count; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
+| `Data\ReadResult` | `final readonly`; `ofList(array $items, int $total)` (throws `\InvalidArgumentException` when `total < count(items)`), `ofCappedList(array $items, int $counted, int $cap)` (`counted <= cap`: `total()` exact; `counted > cap`: `total() = cap` and `isCapped()` true; throws `\InvalidArgumentException` when `cap < count(items)`), `ofOne(mixed $item)`; lazy sisters (from 4.5.0) `ofCountedList(array $items, \Closure $count)` and `ofCappedCountedList(array $items, \Closure $count, int $cap)` - `$count` is `Closure(): int`, runs at the first `total()`/`isCapped()` only, at most once (result kept; a throwing closure keeps nothing), never without a read; the `total < count(items)` check of `ofList` is made at the first read of `total()`, the `cap < count(items)` check at construction; capped: `total()` and `isCapped()` from the one count; `items() total() isCapped() first() isEmpty()` (`isCapped()` is false for `ofList` and `ofOne`) |
 | `Data\LazyCount` | `final`; `__construct(\Closure $count)`; `__invoke(): int` - the one mutable count cell behind the lazy `ReadResult` forms (runs the closure at the first call, keeps the number); internal, built by `ReadResult` |
 | `Data\Reference` | `final readonly`; `__construct(int\|string $root, array $children = [], string $identifier = 'id')`; `root() children() identifier()` - answered as `{@type, <identifier>: root, <child key>: scalar\|null\|list}` |
 | `Data\InputFindings` | `final readonly`; `__construct(public array $fields, public array $errors)`; `fields: list<{field, reason, message, messageKey}>`, `errors: list<string>`; **valid <=> `fields === []`**; `failed(): bool` answers the same |
@@ -199,7 +200,7 @@ All 70 classes, namespace `JardisSupport\Response\`, every handler `final` with 
 | Answer | `data` |
 |---|---|
 | 2xx | `@type` (process name, lcfirst) + public fields of the response; a process answer carries `@outcome` as its first field (set by `MarkOutcome` of `workflow`); a `Reference` answers `@type` + identifier ⇒ root + children |
-| 400/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
+| 400/403/404/409/422 | the form's data as in the table above; the declared message key joins every 4xx last, the 422 always carries its own; an empty `context` is `{}` |
 | other 4xx (401 and 403 included) | declared: the response fields as given plus the key; undeclared: `[]` |
 | 5xx | `[]` |
 
